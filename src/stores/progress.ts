@@ -9,7 +9,13 @@ import { db } from '../lib/firebase'
 import { useAuthStore } from './auth'
 
 const STORAGE_KEY = 'norsklaerling-progress-v1'
-const CLOUD_SAVE_DEBOUNCE_MS = 2000
+/**
+ * Firestore write budget: localStorage is the source of truth during a
+ * session, so we only push to the cloud after a long quiet period — plus
+ * an immediate flush when the tab is hidden/closed or the user logs out.
+ * A whole study session typically costs 1–2 document writes.
+ */
+const CLOUD_SAVE_DEBOUNCE_MS = 30_000
 
 interface ExamAttempt {
   date: string
@@ -55,6 +61,7 @@ export const useProgressStore = defineStore('progress', () => {
 
   let cloudSaveTimer: ReturnType<typeof setTimeout> | null = null
   let applyingCloud = false
+  let lastSavedJson = ''
 
   function userDoc(uid: string) {
     return doc(db!, 'users', uid)
@@ -63,9 +70,15 @@ export const useProgressStore = defineStore('progress', () => {
   async function saveToCloud() {
     const uid = authStore.user?.uid
     if (!uid || !db) return
+    // strip Vue reactivity → plain JSON for Firestore
+    const json = JSON.stringify(state)
+    if (json === lastSavedJson) {
+      syncStatus.value = 'synced'
+      return
+    }
     try {
-      // strip Vue reactivity → plain JSON for Firestore
-      await setDoc(userDoc(uid), JSON.parse(JSON.stringify(state)) as PersistedState)
+      await setDoc(userDoc(uid), JSON.parse(json) as PersistedState)
+      lastSavedJson = json
       syncStatus.value = 'synced'
     } catch {
       syncStatus.value = 'error'
@@ -77,6 +90,22 @@ export const useProgressStore = defineStore('progress', () => {
     if (cloudSaveTimer) clearTimeout(cloudSaveTimer)
     syncStatus.value = 'syncing'
     cloudSaveTimer = setTimeout(saveToCloud, CLOUD_SAVE_DEBOUNCE_MS)
+  }
+
+  /** write pending changes now (tab hidden, page closing, logout) */
+  function flushCloudSave(): Promise<void> {
+    if (cloudSaveTimer) {
+      clearTimeout(cloudSaveTimer)
+      cloudSaveTimer = null
+    }
+    return saveToCloud()
+  }
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') flushCloudSave()
+    })
+    window.addEventListener('pagehide', () => flushCloudSave())
   }
 
   /**
@@ -200,6 +229,7 @@ export const useProgressStore = defineStore('progress', () => {
   return {
     state,
     syncStatus,
+    flushCloudSave,
     gradeCard,
     recordQuiz,
     recordExam,

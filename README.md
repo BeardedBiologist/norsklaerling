@@ -11,8 +11,8 @@ and the [statsborgerprøven](https://prove.hkdir.no/en/norwegian-citizenship-tes
 | Route | Module | What it does |
 |---|---|---|
 | `/` | Dashboard | Streak, words due, learned count, exam facts |
-| `/ord` | Ordforråd | 160 flashcards (A2–B2) with SM-2 spaced repetition, example sentences and Norwegian text-to-speech |
-| `/setninger` | Setningsbygging | Word-tile sentence building drilling V2 inversion, `ikke` placement, subordinate clauses |
+| `/ord` | Ordforråd | 525+ flashcards (A2–B2) with SM-2 spaced repetition, example sentences and Norwegian text-to-speech |
+| `/setninger` | Setningsbygging | 80 word-tile sentence drills for V2 inversion, `ikke` placement, subordinate clauses |
 | `/quiz` | Grammatikkquiz | 40 norskprøve-style multiple-choice grammar questions with explanations |
 | `/statsborger` | Statsborgerprøven | Practice mode with English aid + full exam simulation (36 questions, 60-minute timer, pass at 24) |
 
@@ -35,7 +35,9 @@ npm run build    # type-check + production build
 
 All learning content lives in `src/data/`:
 
-- `vocabulary.ts` — flashcards (keep the `en`/`ei`/`et` gender field for nouns)
+- `vocabulary.ts` + `vocab-a2/b1/b2.ts` — flashcards (keep the `en`/`ei`/`et` gender
+  field for nouns). **Never change or reuse an existing card id** — users' SRS
+  progress in Firestore is keyed by id. New words get new ids in the level files.
 - `sentences.ts` — sentence drills (the `no` field splits on spaces into tiles)
 - `grammarQuiz.ts` / `citizenship.ts` — multiple choice; **the correct answer is
   always index 0 in the data** and options are shuffled at runtime.

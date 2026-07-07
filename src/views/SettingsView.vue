@@ -25,6 +25,12 @@ function resetProgress() {
   confirmingReset.value = false
 }
 
+async function logOut() {
+  // push any pending changes before the auth token goes away
+  await progress.flushCloudSave()
+  await auth.logOut()
+}
+
 function testVoice() {
   speakNorwegian('Hei! Slik høres den norske stemmen ut.')
 }
@@ -57,7 +63,7 @@ function testVoice() {
           {{ syncLabel }}
         </p>
       </div>
-      <button class="btn btn-ghost shrink-0" @click="auth.logOut">Logg ut</button>
+      <button class="btn btn-ghost shrink-0" @click="logOut">Logg ut</button>
     </div>
 
     <!-- study stats -->

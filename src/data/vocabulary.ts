@@ -1,10 +1,17 @@
 import type { VocabCard } from '../types'
+import { vocabA2 } from './vocab-a2'
+import { vocabB1 } from './vocab-b1'
+import { vocabB2 } from './vocab-b2'
 
 /**
  * Core vocabulary for A2 → B2, weighted toward what norskprøven and
  * everyday Norwegian life actually demand. Genders follow bokmål.
+ *
+ * IMPORTANT: card ids are referenced by users' SRS progress in Firestore —
+ * never change or reuse an existing id. New words go in the vocab-a2/b1/b2
+ * expansion files.
  */
-export const vocabulary: VocabCard[] = [
+const core: VocabCard[] = [
   // ───────────────────────── A2 · hverdagsliv ─────────────────────────
   { id: 'v001', no: 'hverdag', en: 'everyday life / weekday', type: 'substantiv', gender: 'en', example: 'Hverdagen min begynner klokka sju.', exampleEn: 'My everyday life starts at seven o’clock.', level: 'A2', topic: 'hverdagsliv' },
   { id: 'v002', no: 'å pleie', en: 'to usually (do) / to care for', type: 'verb', example: 'Jeg pleier å ta bussen til jobb.', exampleEn: 'I usually take the bus to work.', level: 'A2', topic: 'hverdagsliv' },
@@ -197,5 +204,7 @@ export const vocabulary: VocabCard[] = [
   { id: 'v159', no: 'en bærekraft', en: 'sustainability', type: 'substantiv', gender: 'en', example: 'Bærekraft er viktig i norsk politikk.', exampleEn: 'Sustainability is important in Norwegian politics.', level: 'B2', topic: 'samfunn' },
   { id: 'v160', no: 'å redegjøre for', en: 'to account for / explain', type: 'uttrykk', example: 'Ministeren måtte redegjøre for saken i Stortinget.', exampleEn: 'The minister had to account for the matter in Parliament.', level: 'B2', topic: 'samfunn' },
 ]
+
+export const vocabulary: VocabCard[] = [...core, ...vocabA2, ...vocabB1, ...vocabB2]
 
 export const topics = [...new Set(vocabulary.map((v) => v.topic))].sort()

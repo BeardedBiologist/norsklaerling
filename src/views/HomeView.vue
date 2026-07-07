@@ -20,7 +20,7 @@ const modules = [
     to: '/ord',
     no: 'Ord',
     title: 'Ordforråd',
-    desc: 'Flashcards med smart repetisjon. 160 ord fra A2 til B2 med eksempler og uttale.',
+    desc: `Flashcards med smart repetisjon. ${vocabulary.length} ord fra A2 til B2 med eksempler og uttale.`,
     accent: 'rod',
     number: '01',
   },
