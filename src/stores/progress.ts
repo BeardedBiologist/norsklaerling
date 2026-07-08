@@ -26,7 +26,7 @@ interface ExamAttempt {
 
 interface QuizResult {
   date: string
-  module: 'grammar' | 'sentences' | 'citizenship' | 'translation'
+  module: 'grammar' | 'sentences' | 'citizenship' | 'translation' | 'inflection'
   score: number
   total: number
 }

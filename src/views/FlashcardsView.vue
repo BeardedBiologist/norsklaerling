@@ -4,6 +4,7 @@ import { vocabulary } from '../data/vocabulary'
 import { useProgressStore } from '../stores/progress'
 import { isDue } from '../lib/srs'
 import { shuffle } from '../lib/utils'
+import { inflectionLine } from '../lib/inflections'
 import type { Grade, Level, VocabCard } from '../types'
 
 const progress = useProgressStore()
@@ -182,6 +183,9 @@ const gradeButtons: { g: Grade; label: string; cls: string }[] = [
         <template v-else>
           <p v-if="current.gender" class="text-center text-sm font-bold uppercase tracking-wide text-ink-faint">{{ current.gender }} {{ current.no }}</p>
           <p class="display text-center text-3xl font-black text-fjord">{{ current.en }}</p>
+          <p v-if="inflectionLine(current)" class="text-center text-sm font-medium text-ink-soft">
+            {{ inflectionLine(current) }}
+          </p>
           <hr class="dotted-rule w-24" />
           <p class="text-center italic text-ink">«{{ current.example }}»</p>
           <p class="text-center text-sm text-ink-faint">{{ current.exampleEn }}</p>

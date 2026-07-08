@@ -3,6 +3,7 @@ import { nextTick, ref } from 'vue'
 import { vocabulary } from '../data/vocabulary'
 import { lookupOrdbok, ordbokUrl, type OrdbokEntry } from '../lib/ordbok'
 import { speakNorwegian, speechAvailable } from '../lib/speech'
+import { inflectionLine } from '../lib/inflections'
 import type { VocabCard } from '../types'
 
 interface Lookup {
@@ -139,6 +140,7 @@ function clearHistory() {
               }">{{ c.level }}</span>
             </div>
             <p class="text-sm text-fjord">{{ c.en }} <span class="text-ink-faint">· {{ c.type }}</span></p>
+            <p v-if="inflectionLine(c)" class="text-xs text-ink-soft">{{ inflectionLine(c) }}</p>
             <p class="mt-1 text-xs italic text-ink-soft">«{{ c.example }}»</p>
           </div>
         </div>

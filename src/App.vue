@@ -23,6 +23,7 @@ const nav = [
   { to: '/quiz', label: 'Quiz', name: 'quiz' },
   { to: '/statsborger', label: 'Statsborgerprøven', name: 'citizenship' },
   { to: '/oversett', label: 'Oversett', name: 'translate' },
+  { to: '/boyning', label: 'Bøyning', name: 'inflection' },
 ]
 </script>
 

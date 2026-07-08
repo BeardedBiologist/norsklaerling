@@ -56,6 +56,14 @@ const modules = [
     accent: 'rod',
     number: '05',
   },
+  {
+    to: '/boyning',
+    no: 'Bøyning',
+    title: 'Bøyning',
+    desc: 'Preteritum, bestemt form, komparativ — skriv riktig form. Fasit fra den offisielle ordboka.',
+    accent: 'fjord',
+    number: '06',
+  },
 ]
 </script>
 
