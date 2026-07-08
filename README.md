@@ -11,8 +11,8 @@ and the [statsborgerprøven](https://prove.hkdir.no/en/norwegian-citizenship-tes
 | Route | Module | What it does |
 |---|---|---|
 | `/` | Dashboard | Streak, words due, learned count, exam facts |
-| `/ord` | Ordforråd | 525+ flashcards (A2–B2) with SM-2 spaced repetition, example sentences and Norwegian text-to-speech |
-| `/setninger` | Setningsbygging | 80 word-tile sentence drills for V2 inversion, `ikke` placement, subordinate clauses |
+| `/ord` | Ordforråd | 2000+ flashcards (A2–B2) with SM-2 spaced repetition, example sentences and Norwegian text-to-speech |
+| `/setninger` | Setningsbygging | 120 word-tile sentence drills for V2 inversion, `ikke` placement, subordinate clauses |
 | `/quiz` | Grammatikkquiz | 40 norskprøve-style multiple-choice grammar questions with explanations |
 | `/statsborger` | Statsborgerprøven | Practice mode with English aid + full exam simulation (36 questions, 60-minute timer, pass at 24) |
 

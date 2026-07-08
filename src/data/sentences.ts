@@ -106,4 +106,63 @@ export const sentences: SentenceExercise[] = [
   { id: 's78', no: 'Det som bekymrer meg mest er de økende prisene', en: 'What worries me most is the rising prices', level: 'B2', focus: 'utbrytning', hint: 'Det som … er … cleft.' },
   { id: 's79', no: 'Hadde det ikke vært for naboene hadde vi aldri klart det', en: 'Had it not been for the neighbours we would never have managed', level: 'B2', focus: 'kondisjonalis', hint: 'Verb-first in both clauses.' },
   { id: 's80', no: 'Debatten handler i bunn og grunn om tillit', en: 'The debate is fundamentally about trust', level: 'B2', focus: 'idiomer', hint: '«i bunn og grunn» = basically, at heart.' },
+
+  // ── s81-s120 · traffic, housing, bureaucracy, school, life events, climate ──
+  // A2 · traffic & town
+  { id: 's81', no: 'Du må kjøre sakte i rundkjøringen', en: 'You must drive slowly in the roundabout', level: 'A2', focus: 'grunnleggende ordstilling', hint: 'Subject – modal – verb – adverb – place.' },
+  { id: 's82', no: 'Bussen er forsinket på grunn av en ulykke', en: 'The bus is delayed because of an accident', level: 'A2', focus: 'forklaring', hint: 'på grunn av + noun explains the reason.' },
+  { id: 's83', no: 'Det er vanskelig å finne parkering i sentrum', en: 'It is hard to find parking in the centre', level: 'A2', focus: 'det-setninger', hint: 'Det er + adjective + å + infinitive.' },
+  { id: 's84', no: 'Vi tar ferga fordi broa er stengt', en: 'We are taking the ferry because the bridge is closed', level: 'A2', focus: 'forklaring', hint: 'fordi + subject + verb.' },
+  { id: 's85', no: 'Hvor er nærmeste bensinstasjon', en: 'Where is the nearest petrol station', level: 'A2', focus: 'spørsmål', hint: 'Hvor + verb + subject.' },
+
+  // A2 · money & shopping
+  { id: 's86', no: 'Jeg betaler regningene i nettbanken hver måned', en: 'I pay the bills in the online bank every month', level: 'A2', focus: 'grunnleggende ordstilling', hint: 'Time at the end: hver måned.' },
+  { id: 's87', no: 'Kan jeg betale med kort eller kontanter', en: 'Can I pay by card or cash', level: 'A2', focus: 'spørsmål', hint: 'Question starts with the modal verb.' },
+  { id: 's88', no: 'Det lønner seg å sammenligne priser før du kjøper', en: 'It pays to compare prices before you buy', level: 'A2', focus: 'det-setninger', hint: 'Det lønner seg å + infinitive.' },
+  { id: 's89', no: 'Jeg har ikke råd til å kjøpe ny mobil nå', en: 'I cannot afford to buy a new mobile now', level: 'A2', focus: 'faste uttrykk', hint: 'å ha råd til å + infinitive.' },
+  { id: 's90', no: 'Hun overførte penger til sparekontoen i går', en: 'She transferred money to the savings account yesterday', level: 'A2', focus: 'preteritum', hint: 'Past tense: overførte.' },
+
+  // B1 · housing & bureaucracy
+  { id: 's91', no: 'Husleia inkluderer strøm internett og felleskostnader', en: 'The rent includes electricity, internet and shared costs', level: 'B1', focus: 'grunnleggende ordstilling', hint: 'List items with commas; og before the last item.' },
+  { id: 's92', no: 'Vi må sende søknaden før fristen går ut', en: 'We must send the application before the deadline expires', level: 'B1', focus: 'før-setning', hint: 'før + subject + verb.' },
+  { id: 's93', no: 'Etter at vi flyttet inn har vi trivdes veldig godt', en: 'Since we moved in we have been very happy', level: 'B1', focus: 'etter at', hint: 'etter at + past; main clause inversion: har vi.' },
+  { id: 's94', no: 'Behandlingstiden for oppholdstillatelse er dessverre lang', en: 'The processing time for a residence permit is unfortunately long', level: 'B1', focus: 'formelt språk', hint: 'Subject – verb – adverb – adjective.' },
+  { id: 's95', no: 'Hvis du ikke fornyer kortet ditt mister du rettighetene', en: 'If you do not renew your card you lose the rights', level: 'B1', focus: 'hvis-setning', hint: 'Condition first; main clause: mister du.' },
+  { id: 's96', no: 'Jeg håper at vi får flytte inn til neste måned', en: 'I hope that we can move in by next month', level: 'B1', focus: 'leddsetning med at', hint: 'at + subject + verb — no inversion.' },
+  { id: 's97', no: 'På generalforsamlingen diskuterte beboerne felleskostnadene', en: 'At the general meeting the residents discussed the shared costs', level: 'B1', focus: 'inversjon (V2)', hint: 'Place first → diskuterte beboerne.' },
+
+  // B1 · school & university
+  { id: 's98', no: 'Datteren min begynner på videregående til høsten', en: 'My daughter starts upper secondary school this autumn', level: 'B1', focus: 'grunnleggende ordstilling', hint: 'Possessive + noun as subject.' },
+  { id: 's99', no: 'Han leser til eksamen så han kan ikke komme i kveld', en: 'He is studying for the exam so he cannot come tonight', level: 'B1', focus: 'forklaring', hint: 'så introduces the consequence.' },
+  { id: 's100', no: 'Innleveringen må være ferdig før klokka tolv', en: 'The assignment must be finished before twelve o’clock', level: 'B1', focus: 'modalverb', hint: 'må + være + adjective.' },
+  { id: 's101', no: 'Studentene får støtte fra Lånekassen hvert semester', en: 'The students receive support from the Loan Fund every semester', level: 'B1', focus: 'grunnleggende ordstilling', hint: 'Subject – verb – object – source – time.' },
+
+  // B1 · life events
+  { id: 's102', no: 'De skal gifte seg i sommer etter ti år sammen', en: 'They are getting married this summer after ten years together', level: 'B1', focus: 'faste uttrykk', hint: 'å gifte seg = to get married.' },
+  { id: 's103', no: 'Hun er gravid og skal ha barselpermisjon til våren', en: 'She is pregnant and will take parental leave in the spring', level: 'B1', focus: 'grunnleggende ordstilling', hint: 'Two clauses joined by og.' },
+  { id: 's104', no: 'Etter skilsmissen deler de omsorgen for barna', en: 'After the divorce they share custody of the children', level: 'B1', focus: 'etter', hint: 'etter + noun; subject + verb.' },
+  { id: 's105', no: 'Han pensjonerte seg da han fylte sekstisju', en: 'He retired when he turned sixty-seven', level: 'B1', focus: 'da-setning', hint: 'da + past tense for a single event.' },
+
+  // B1 · climate & environment
+  { id: 's106', no: 'Klimaendringene påvirker været i hele verden', en: 'Climate change affects the weather all over the world', level: 'B1', focus: 'formelt språk', hint: 'Subject – verb – object – place.' },
+  { id: 's107', no: 'Norge produserer nesten all strøm fra vannkraft', en: 'Norway produces almost all its electricity from hydropower', level: 'B1', focus: 'grunnleggende ordstilling', hint: 'Subject – verb – quantity – object – source.' },
+  { id: 's108', no: 'Det er viktig å sortere søppelet riktig', en: 'It is important to sort the rubbish correctly', level: 'B1', focus: 'det-setninger', hint: 'Det er + adjective + å + infinitive.' },
+  { id: 's109', no: 'Flere og flere velger å kjøpe elbil i Norge', en: 'More and more people choose to buy an electric car in Norway', level: 'B1', focus: 'infinitiv med å', hint: 'velger å + infinitive.' },
+
+  // B2 · law & justice
+  { id: 's110', no: 'Alle er like for loven uansett hvor de kommer fra', en: 'Everyone is equal before the law regardless of where they come from', level: 'B2', focus: 'uansett', hint: 'uansett + question word = regardless.' },
+  { id: 's111', no: 'Hvis du bryter loven må du ta konsekvensene', en: 'If you break the law you must face the consequences', level: 'B2', focus: 'hvis-setning', hint: 'Condition first → må du.' },
+  { id: 's112', no: 'Retten konkluderte med at tiltalte var skyldig', en: 'The court concluded that the accused was guilty', level: 'B2', focus: 'formelt språk', hint: 'konkluderte med at + subject + verb.' },
+  { id: 's113', no: 'Til tross for mangel på bevis ble han frikjent', en: 'Despite the lack of evidence he was acquitted', level: 'B2', focus: 'til tross for', hint: 'Fronted phrase → ble han frikjent.' },
+
+  // B2 · politics & economy
+  { id: 's114', no: 'Regjeringen la fram et nytt lovforslag i går', en: 'The government presented a new bill yesterday', level: 'B2', focus: 'formelt språk', hint: 'la fram = presented; time at the end.' },
+  { id: 's115', no: 'Et flertall på Stortinget stemte for forslaget', en: 'A majority in Parliament voted for the proposal', level: 'B2', focus: 'formelt språk', hint: 'Subject – place – verb – preposition – object.' },
+  { id: 's116', no: 'Inflasjonen gjør at vanlige folk får mindre å rutte med', en: 'Inflation means that ordinary people have less to manage with', level: 'B2', focus: 'leddsetning med at', hint: 'gjør at + subject + verb.' },
+  { id: 's117', no: 'Næringslivet trenger flere fagarbeidere for å vokse', en: 'The business sector needs more skilled workers to grow', level: 'B2', focus: 'infinitiv med å', hint: 'trenger + object + for å + infinitive.' },
+
+  // B2 · argumentation & society
+  { id: 's118', no: 'La meg først oppsummere de viktigste argumentene', en: 'Let me first summarise the main arguments', level: 'B2', focus: 'meninger', hint: 'La meg + infinitive.' },
+  { id: 's119', no: 'Det er ingen selvfølge at alle har tilgang på helsehjelp', en: 'It is not a given that everyone has access to healthcare', level: 'B2', focus: 'det-setninger', hint: 'Det er ingen selvfølge at + clause.' },
+  { id: 's120', no: 'Jo mer samfunnet endrer seg desto viktigere blir utdanning', en: 'The more society changes, the more important education becomes', level: 'B2', focus: 'jo … desto', hint: 'Jo + comparative … desto + comparative + verb + subject.' },
 ]

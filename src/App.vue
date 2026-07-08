@@ -3,6 +3,7 @@ import { useRoute } from 'vue-router'
 import { useProgressStore } from './stores/progress'
 import { useAuthStore } from './stores/auth'
 import LoginGate from './components/LoginGate.vue'
+import DictionaryWidget from './components/DictionaryWidget.vue'
 
 const progress = useProgressStore()
 const auth = useAuthStore()
@@ -97,5 +98,7 @@ const nav = [
         Offisiell info: <a href="https://prove.hkdir.no" target="_blank" rel="noopener" class="underline hover:text-fjord">prove.hkdir.no</a>
       </div>
     </footer>
+
+    <DictionaryWidget />
   </div>
 </template>

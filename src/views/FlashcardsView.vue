@@ -4,7 +4,6 @@ import { vocabulary } from '../data/vocabulary'
 import { useProgressStore } from '../stores/progress'
 import { isDue } from '../lib/srs'
 import { shuffle } from '../lib/utils'
-import { speakNorwegian, speechAvailable } from '../lib/speech'
 import type { Grade, Level, VocabCard } from '../types'
 
 const progress = useProgressStore()
@@ -19,6 +18,10 @@ const index = ref(0)
 const flipped = ref(false)
 const graded = ref<Record<Grade, number>>({ again: 0, hard: 0, good: 0, easy: 0 })
 const sessionDone = ref(false)
+const genderMode = ref(true)
+const genderGuess = ref<'en' | 'ei' | 'et' | null>(null)
+
+const showGenderQuiz = computed(() => genderMode.value && !!current.value?.gender && genderGuess.value === null)
 
 const pool = computed(() =>
   vocabulary.filter(
@@ -36,6 +39,7 @@ function startSession(onlyDue: boolean) {
   flipped.value = false
   sessionDone.value = false
   graded.value = { again: 0, hard: 0, good: 0, easy: 0 }
+  genderGuess.value = null
 }
 
 function grade(g: Grade) {
@@ -43,6 +47,7 @@ function grade(g: Grade) {
   progress.gradeCard(current.value.id, g)
   graded.value[g]++
   flipped.value = false
+  genderGuess.value = null
   // wait for the flip-back before advancing so the answer isn't spoiled
   setTimeout(() => {
     if (index.value + 1 >= session.value.length) {
@@ -53,13 +58,8 @@ function grade(g: Grade) {
   }, 220)
 }
 
-function speak() {
-  if (!current.value) return
-  speakNorwegian(current.value.no)
-}
-function speakExample() {
-  if (!current.value) return
-  speakNorwegian(current.value.example)
+function guessGender(g: 'en' | 'ei' | 'et') {
+  genderGuess.value = g
 }
 
 const gradeButtons: { g: Grade; label: string; cls: string }[] = [
@@ -102,6 +102,13 @@ const gradeButtons: { g: Grade; label: string; cls: string }[] = [
 
         <hr class="dotted-rule my-5" />
 
+        <label class="flex cursor-pointer items-center gap-3">
+          <input v-model="genderMode" type="checkbox" class="h-4 w-4 accent-fjord" />
+          <span class="text-sm font-medium text-ink">Øv på kjønn: velg <em>en / ei / et</em> først</span>
+        </label>
+
+        <hr class="dotted-rule my-5" />
+
         <div class="flex flex-col gap-3 sm:flex-row">
           <button
             class="btn btn-accent flex-1"
@@ -138,57 +145,66 @@ const gradeButtons: { g: Grade; label: string; cls: string }[] = [
         ></div>
       </div>
 
-      <!-- flip card -->
-      <div class="flip-scene mt-6 h-80 cursor-pointer select-none" @click="flipped = !flipped">
-        <div class="flip-inner" :class="{ 'is-flipped': flipped }">
-          <div class="flip-face card flex flex-col items-center justify-center gap-3 p-8">
-            <p class="kicker">{{ current.type }}</p>
-            <p class="display text-center text-4xl font-black text-ink">
-              <span v-if="current.gender" class="text-ink-faint">{{ current.gender }}&nbsp;</span>{{ current.no }}
-            </p>
-            <button
-              v-if="speechAvailable()"
-              class="btn btn-ghost mt-2"
-              @click.stop="speak"
-              title="Hør uttalen"
-            >
-              🔊 Hør
-            </button>
-            <p class="mt-4 text-xs text-ink-faint">Trykk for å snu kortet</p>
-          </div>
+      <!-- card -->
+      <div class="card mt-6 min-h-[20rem] flex flex-col items-center justify-center gap-4 p-8 select-none">
+        <template v-if="!flipped">
+          <p class="kicker">{{ current.type }}</p>
+          <p class="display text-center text-4xl font-black text-ink">
+            <template v-if="showGenderQuiz">
+              <span class="inline-block w-20 border-b-2 border-ink-faint text-ink-faint">___</span>&nbsp;{{ current.no }}
+            </template>
+            <template v-else-if="current.gender">
+              <span :class="genderMode && genderGuess ? (genderGuess === current.gender ? 'text-moss' : 'text-rod-deep') : 'text-ink-faint'">{{ current.gender }}</span>&nbsp;{{ current.no }}
+            </template>
+            <template v-else>
+              {{ current.no }}
+            </template>
+          </p>
 
-          <div class="flip-back flip-face card flex flex-col items-center justify-center gap-3 border-fjord p-8">
-            <p class="display text-center text-3xl font-black text-fjord">{{ current.en }}</p>
-            <hr class="dotted-rule w-24" />
-            <p class="text-center italic text-ink">«{{ current.example }}»</p>
-            <p class="text-center text-sm text-ink-faint">{{ current.exampleEn }}</p>
+          <!-- gender quiz inside the card -->
+          <div v-if="showGenderQuiz" class="flex flex-wrap justify-center gap-2">
             <button
-              v-if="speechAvailable()"
-              class="btn btn-ghost"
-              @click.stop="speakExample"
-              title="Hør eksempelsetningen"
+              v-for="g in (['en', 'ei', 'et'] as const)"
+              :key="g"
+              class="btn btn-ghost min-w-[3.5rem] font-bold capitalize"
+              @click="guessGender(g)"
             >
-              🔊 Hør setningen
+              {{ g }}
             </button>
           </div>
+          <p v-else-if="current.gender && genderMode" class="text-center text-sm font-medium" :class="genderGuess === current.gender ? 'text-moss' : 'text-rod-deep'">
+            {{ genderGuess === current.gender ? 'Riktig kjønn!' : `Det er ${current.gender} ${current.no}.` }}
+          </p>
+
+          <p class="text-xs text-ink-faint">Trykk under for å se betydningen.</p>
+        </template>
+
+        <template v-else>
+          <p v-if="current.gender" class="text-center text-sm font-bold uppercase tracking-wide text-ink-faint">{{ current.gender }} {{ current.no }}</p>
+          <p class="display text-center text-3xl font-black text-fjord">{{ current.en }}</p>
+          <hr class="dotted-rule w-24" />
+          <p class="text-center italic text-ink">«{{ current.example }}»</p>
+          <p class="text-center text-sm text-ink-faint">{{ current.exampleEn }}</p>
+        </template>
+      </div>
+
+      <!-- controls -->
+      <div class="mt-5">
+        <div v-if="!flipped" class="flex justify-center">
+          <button class="btn btn-accent w-full sm:w-auto px-10" @click="flipped = !flipped">Snu kortet</button>
+        </div>
+        <div v-else class="pop grid grid-cols-4 gap-2">
+          <button
+            v-for="b in gradeButtons"
+            :key="b.g"
+            class="btn"
+            :class="b.cls"
+            @click="grade(b.g)"
+          >
+            {{ b.label }}
+          </button>
         </div>
       </div>
-
-      <!-- grading -->
-      <div v-if="flipped" class="pop mt-5 grid grid-cols-4 gap-2">
-        <button
-          v-for="b in gradeButtons"
-          :key="b.g"
-          class="btn"
-          :class="b.cls"
-          @click="grade(b.g)"
-        >
-          {{ b.label }}
-        </button>
-      </div>
-      <p v-else class="mt-5 text-center text-sm text-ink-faint">
-        Husker du hva ordet betyr? Snu kortet og vurder deg selv.
-      </p>
 
       <button class="btn btn-ghost mx-auto mt-6 block" @click="session = []">
         Avslutt økten
