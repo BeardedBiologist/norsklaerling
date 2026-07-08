@@ -5,6 +5,8 @@ export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', name: 'home', component: HomeView },
+    { path: '/laer', name: 'learn', component: () => import('./views/LearnView.vue') },
+    { path: '/laer/:id', name: 'lesson', component: () => import('./views/LessonView.vue') },
     { path: '/ord', name: 'flashcards', component: () => import('./views/FlashcardsView.vue') },
     { path: '/setninger', name: 'sentences', component: () => import('./views/SentenceBuilderView.vue') },
     { path: '/quiz', name: 'quiz', component: () => import('./views/QuizView.vue') },

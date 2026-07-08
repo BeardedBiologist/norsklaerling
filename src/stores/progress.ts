@@ -36,10 +36,11 @@ interface PersistedState {
   activityDays: string[]
   quizResults: QuizResult[]
   examAttempts: ExamAttempt[]
+  readLessons: string[]
 }
 
 function emptyState(): PersistedState {
-  return { srs: {}, activityDays: [], quizResults: [], examAttempts: [] }
+  return { srs: {}, activityDays: [], quizResults: [], examAttempts: [], readLessons: [] }
 }
 
 function load(): PersistedState {
@@ -127,6 +128,7 @@ export const useProgressStore = defineStore('progress', () => {
     for (const a of cloud.examAttempts ?? []) {
       if (!seenExam.has(JSON.stringify(a))) state.examAttempts.push(a)
     }
+    state.readLessons = [...new Set([...state.readLessons, ...(cloud.readLessons ?? [])])]
   }
 
   // on sign-in: pull cloud state, merge, push the merged result back
@@ -182,6 +184,15 @@ export const useProgressStore = defineStore('progress', () => {
     recordActivity()
   }
 
+  function markLessonRead(id: string) {
+    if (!state.readLessons.includes(id)) state.readLessons.push(id)
+    recordActivity()
+  }
+
+  function isLessonRead(id: string): boolean {
+    return state.readLessons.includes(id)
+  }
+
   const dueCards = computed(() =>
     vocabulary.filter((v) => isDue(state.srs[v.id])),
   )
@@ -224,6 +235,7 @@ export const useProgressStore = defineStore('progress', () => {
     state.activityDays = []
     state.quizResults = []
     state.examAttempts = []
+    state.readLessons = []
   }
 
   return {
@@ -234,6 +246,8 @@ export const useProgressStore = defineStore('progress', () => {
     recordQuiz,
     recordExam,
     recordActivity,
+    markLessonRead,
+    isLessonRead,
     dueCards,
     learnedCount,
     seenCount,

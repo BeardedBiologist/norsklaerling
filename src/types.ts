@@ -50,6 +50,36 @@ export interface CitizenshipQuestion {
   explanation: string
 }
 
+export interface LessonExample {
+  no: string
+  en: string
+  /** short annotation, e.g. which rule the example shows */
+  note?: string
+}
+
+export interface LessonSection {
+  heading?: string
+  /** paragraphs separated by blank lines; grammar lessons are in English,
+   *  samfunn chapters in Norwegian */
+  body: string
+  /** English translation of a Norwegian body (samfunn chapters) */
+  bodyEn?: string
+  examples?: LessonExample[]
+}
+
+export interface Lesson {
+  id: string
+  title: string
+  titleEn: string
+  category: 'grammatikk' | 'samfunn'
+  level: Level
+  /** one-line teaser for the hub */
+  teaser: string
+  sections: LessonSection[]
+  /** where to practise what this lesson teaches */
+  test: { to: string; label: string }
+}
+
 /** spaced-repetition state for one card */
 export interface SrsState {
   ease: number

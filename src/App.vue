@@ -18,6 +18,7 @@ const syncLabel: Record<string, string> = {
 
 const nav = [
   { to: '/', label: 'Hjem', name: 'home' },
+  { to: '/laer', label: 'Lær', name: 'learn' },
   { to: '/ord', label: 'Ord', name: 'flashcards' },
   { to: '/setninger', label: 'Setninger', name: 'sentences' },
   { to: '/quiz', label: 'Quiz', name: 'quiz' },
@@ -80,7 +81,7 @@ const nav = [
           :to="item.to"
           class="whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-bold no-underline transition-colors"
           :class="
-            route.name === item.name
+            route.name === item.name || (item.name === 'learn' && route.name === 'lesson')
               ? 'bg-fjord text-card'
               : 'text-ink-soft hover:bg-paper-warm hover:text-ink'
           "

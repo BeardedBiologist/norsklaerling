@@ -5,6 +5,7 @@ import { useProgressStore } from '../stores/progress'
 import { isDue } from '../lib/srs'
 import { shuffle } from '../lib/utils'
 import { inflectionLine } from '../lib/inflections'
+import { speakNorwegian, speechAvailable } from '../lib/speech'
 import type { Grade, Level, VocabCard } from '../types'
 
 const progress = useProgressStore()
@@ -21,6 +22,8 @@ const graded = ref<Record<Grade, number>>({ again: 0, hard: 0, good: 0, easy: 0 
 const sessionDone = ref(false)
 const genderMode = ref(true)
 const genderGuess = ref<'en' | 'ei' | 'et' | null>(null)
+/** 'study' = SRS quiz · 'learn' = new words shown fully first */
+const mode = ref<'study' | 'learn'>('study')
 
 const showGenderQuiz = computed(() => genderMode.value && !!current.value?.gender && genderGuess.value === null)
 
@@ -30,10 +33,13 @@ const pool = computed(() =>
   ),
 )
 const duePool = computed(() => pool.value.filter((v) => isDue(progress.state.srs[v.id])))
+/** words never seen before — candidates for the learn mode */
+const newPool = computed(() => pool.value.filter((v) => !progress.state.srs[v.id]))
 
 const current = computed(() => session.value[index.value])
 
 function startSession(onlyDue: boolean) {
+  mode.value = 'study'
   const source = onlyDue ? duePool.value : pool.value
   session.value = shuffle(source).slice(0, SESSION_SIZE)
   index.value = 0
@@ -41,6 +47,25 @@ function startSession(onlyDue: boolean) {
   sessionDone.value = false
   graded.value = { again: 0, hard: 0, good: 0, easy: 0 }
   genderGuess.value = null
+}
+
+const LEARN_SIZE = 15
+
+function startLearn() {
+  mode.value = 'learn'
+  session.value = shuffle(newPool.value).slice(0, LEARN_SIZE)
+  index.value = 0
+  sessionDone.value = false
+  graded.value = { again: 0, hard: 0, good: 0, easy: 0 }
+}
+
+/** learn mode: either queue the word for practice or mark it already known */
+function learnDecision(known: boolean) {
+  if (!current.value) return
+  progress.gradeCard(current.value.id, known ? 'easy' : 'again')
+  graded.value[known ? 'easy' : 'again']++
+  if (index.value + 1 >= session.value.length) sessionDone.value = true
+  else index.value++
 }
 
 function grade(g: Grade) {
@@ -80,10 +105,17 @@ const gradeButtons: { g: Grade; label: string; cls: string }[] = [
     <template v-if="session.length === 0 || sessionDone">
       <div v-if="sessionDone" class="card pop mt-6 p-6 text-center">
         <p class="display text-2xl font-black text-moss">Økt fullført! 🎉</p>
-        <p class="mt-2 text-sm text-ink-soft">
+        <p v-if="mode === 'learn'" class="mt-2 text-sm text-ink-soft">
+          {{ graded.again }} nye ord lagt i øvingskøen ·
+          {{ graded.easy }} kunne du fra før
+        </p>
+        <p v-else class="mt-2 text-sm text-ink-soft">
           {{ graded.good + graded.easy }} satt ·
           {{ graded.hard }} vanskelige ·
           {{ graded.again }} må repeteres
+        </p>
+        <p v-if="mode === 'learn' && graded.again > 0" class="mt-1 text-xs text-ink-faint">
+          Ordene i øvingskøen dukker opp i «Repeter»-økten om noen minutter.
         </p>
       </div>
 
@@ -112,6 +144,13 @@ const gradeButtons: { g: Grade; label: string; cls: string }[] = [
 
         <div class="flex flex-col gap-3 sm:flex-row">
           <button
+            class="btn flex-1 bg-moss text-card hover:bg-moss/90"
+            :disabled="newPool.length === 0"
+            @click="startLearn"
+          >
+            Lær {{ Math.min(newPool.length, LEARN_SIZE) }} nye ord
+          </button>
+          <button
             class="btn btn-accent flex-1"
             :disabled="duePool.length === 0"
             @click="startSession(true)"
@@ -122,10 +161,55 @@ const gradeButtons: { g: Grade; label: string; cls: string }[] = [
             Øv på tilfeldige ord
           </button>
         </div>
+        <p class="mt-3 text-center text-xs text-ink-faint">
+          <strong>Lær</strong> viser hele kortet først — ord, kjønn, bøyning og eksempel —
+          før ordet legges i øvingskøen. <strong>Repeter</strong> tester det du har lært.
+        </p>
         <p v-if="duePool.length === 0" class="mt-3 text-center text-xs text-ink-faint">
           Ingen ord å repetere på dette nivået akkurat nå — godt jobbet!
         </p>
       </div>
+    </template>
+
+    <!-- learn screen: whole card visible, no quiz -->
+    <template v-else-if="mode === 'learn' && current">
+      <div class="mt-6 flex items-center justify-between text-xs font-bold text-ink-faint">
+        <span>Nytt ord {{ index + 1 }} / {{ session.length }}</span>
+        <span class="chip bg-moss-wash text-moss">{{ current.level }} · {{ current.topic }}</span>
+      </div>
+
+      <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-paper-warm">
+        <div class="h-full rounded-full bg-moss transition-all duration-300" :style="{ width: `${(index / session.length) * 100}%` }"></div>
+      </div>
+
+      <div class="card mt-6 flex flex-col items-center gap-3 p-8">
+        <p class="kicker">{{ current.type }}</p>
+        <p class="display text-center text-4xl font-black text-ink">
+          <span v-if="current.gender" class="text-ink-faint">{{ current.gender }}&nbsp;</span>{{ current.no }}
+        </p>
+        <button v-if="speechAvailable()" class="btn btn-ghost !py-1" @click="speakNorwegian(current.no)">🔊 Hør ordet</button>
+
+        <p class="display text-2xl font-black text-fjord">{{ current.en }}</p>
+        <p v-if="inflectionLine(current)" class="text-center text-sm font-medium text-ink-soft">
+          {{ inflectionLine(current) }}
+        </p>
+
+        <hr class="dotted-rule w-24" />
+        <p class="text-center italic text-ink">
+          «{{ current.example }}»
+          <button v-if="speechAvailable()" class="ml-1 text-sm not-italic" title="Hør setningen" @click="speakNorwegian(current.example)">🔊</button>
+        </p>
+        <p class="text-center text-sm text-ink-faint">{{ current.exampleEn }}</p>
+      </div>
+
+      <div class="mt-5 flex flex-col gap-2 sm:flex-row">
+        <button class="btn btn-ghost flex-1" @click="learnDecision(true)">✓ Kan denne fra før</button>
+        <button class="btn flex-1 bg-moss text-card hover:bg-moss/90" @click="learnDecision(false)">
+          + Legg i øvingskøen
+        </button>
+      </div>
+
+      <button class="btn btn-ghost mx-auto mt-6 block" @click="session = []">Avslutt økten</button>
     </template>
 
     <!-- study screen -->

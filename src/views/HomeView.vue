@@ -17,6 +17,14 @@ const quizAccuracy = computed(() =>
 
 const modules = [
   {
+    to: '/laer',
+    no: 'Lær',
+    title: 'Leksjoner',
+    desc: 'Start her: grammatikk forklart på engelsk og hele pensumet til statsborgerprøven — lær først, test etterpå.',
+    accent: 'moss',
+    number: '00',
+  },
+  {
     to: '/ord',
     no: 'Ord',
     title: 'Ordforråd',
