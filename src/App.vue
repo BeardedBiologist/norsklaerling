@@ -22,6 +22,7 @@ const nav = [
   { to: '/setninger', label: 'Setninger', name: 'sentences' },
   { to: '/quiz', label: 'Quiz', name: 'quiz' },
   { to: '/statsborger', label: 'Statsborgerprøven', name: 'citizenship' },
+  { to: '/oversett', label: 'Oversett', name: 'translate' },
 ]
 </script>
 

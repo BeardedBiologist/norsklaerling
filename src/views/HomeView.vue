@@ -48,6 +48,14 @@ const modules = [
     accent: 'gull',
     number: '04',
   },
+  {
+    to: '/oversett',
+    no: 'Oversett',
+    title: 'Oversettelse',
+    desc: 'Skriv norsken selv: engelsk setning inn, din norske oversettelse ut. Fri produksjon som på muntligprøven.',
+    accent: 'rod',
+    number: '05',
+  },
 ]
 </script>
 

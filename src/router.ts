@@ -9,6 +9,7 @@ export const router = createRouter({
     { path: '/setninger', name: 'sentences', component: () => import('./views/SentenceBuilderView.vue') },
     { path: '/quiz', name: 'quiz', component: () => import('./views/QuizView.vue') },
     { path: '/statsborger', name: 'citizenship', component: () => import('./views/CitizenshipView.vue') },
+    { path: '/oversett', name: 'translate', component: () => import('./views/TranslateView.vue') },
     { path: '/innstillinger', name: 'settings', component: () => import('./views/SettingsView.vue') },
   ],
   scrollBehavior: () => ({ top: 0 }),
