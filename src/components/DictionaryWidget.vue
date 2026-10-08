@@ -134,6 +134,7 @@ function clearHistory() {
                 <button v-if="speechAvailable()" class="ml-1 text-sm" title="Hør uttalen" @click="speakNorwegian(c.no)">🔊</button>
               </p>
               <span class="chip shrink-0" :class="{
+                'bg-gull-wash text-gull': c.level === 'A1',
                 'bg-moss-wash text-moss': c.level === 'A2',
                 'bg-fjord-wash text-fjord': c.level === 'B1',
                 'bg-rod-wash text-rod-deep': c.level === 'B2',

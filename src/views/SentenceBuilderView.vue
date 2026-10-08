@@ -1,15 +1,21 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { sentences } from '../data/sentences'
+import { chapterByN, chapterFromQuery, kursSentences } from '../data/kurs'
 import { useProgressStore } from '../stores/progress'
 import { shuffle } from '../lib/utils'
 import { speakNorwegian, speechAvailable } from '../lib/speech'
 import type { Level, SentenceExercise } from '../types'
 
 const progress = useProgressStore()
+const route = useRoute()
+
+/** ?kapittel=N drills only that Nybegynnerkurs chapter */
+const chapter = computed(() => chapterFromQuery(route.query.kapittel))
 
 const levelFilter = ref<Level | 'alle'>('alle')
-const levels: (Level | 'alle')[] = ['alle', 'A2', 'B1', 'B2']
+const levels: (Level | 'alle')[] = ['alle', 'A1', 'A2', 'B1', 'B2']
 
 interface Tile {
   word: string
@@ -40,9 +46,11 @@ function loadExercise() {
 }
 
 function start() {
-  const pool = sentences.filter(
-    (s) => levelFilter.value === 'alle' || s.level === levelFilter.value,
-  )
+  const pool = chapter.value
+    ? chapterByN(chapter.value)!.sentences
+    : [...kursSentences, ...sentences].filter(
+        (s) => levelFilter.value === 'alle' || s.level === levelFilter.value,
+      )
   session.value = shuffle(pool).slice(0, 10)
   index.value = 0
   score.value = 0
@@ -119,6 +127,11 @@ function next() {
       </div>
 
       <div class="card rise rise-2 mt-6 p-6">
+        <div v-if="chapter" class="flex flex-wrap items-center justify-between gap-2">
+          <span class="chip bg-gull-wash text-gull">Kapittel {{ chapter }} · {{ chapterByN(chapter)?.title }}</span>
+          <RouterLink to="/setninger" class="text-xs font-bold text-ink-faint no-underline hover:text-fjord">Vis alle nivåer i stedet</RouterLink>
+        </div>
+        <template v-else>
         <p class="mb-3 text-sm font-bold text-ink-soft">Velg nivå</p>
         <div class="flex flex-wrap gap-2">
           <button
@@ -131,8 +144,11 @@ function next() {
             {{ l === 'alle' ? 'Alle nivåer' : l }}
           </button>
         </div>
+        </template>
         <hr class="dotted-rule my-5" />
-        <button class="btn btn-accent w-full" @click="start">Start 10 setninger</button>
+        <button class="btn btn-accent w-full" @click="start">
+          {{ chapter ? 'Start kapittelets setninger' : 'Start 10 setninger' }}
+        </button>
       </div>
     </template>
 

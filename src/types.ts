@@ -1,6 +1,15 @@
-export type Level = 'A2' | 'B1' | 'B2'
+export type Level = 'A1' | 'A2' | 'B1' | 'B2'
 
-export type WordType = 'substantiv' | 'verb' | 'adjektiv' | 'adverb' | 'uttrykk' | 'preposisjon'
+export type WordType =
+  | 'substantiv'
+  | 'verb'
+  | 'adjektiv'
+  | 'adverb'
+  | 'uttrykk'
+  | 'preposisjon'
+  | 'pronomen'
+  | 'konjunksjon'
+  | 'tallord'
 
 export interface VocabCard {
   id: string
@@ -13,6 +22,8 @@ export interface VocabCard {
   exampleEn: string
   level: Level
   topic: string
+  /** Nybegynnerkurs chapter (1–12) that introduces the word */
+  chapter?: number
 }
 
 export interface SentenceExercise {
@@ -92,3 +103,30 @@ export interface SrsState {
 }
 
 export type Grade = 'again' | 'hard' | 'good' | 'easy'
+
+/** one chapter of the A1–A2 Nybegynnerkurs, sequenced after NTNU LearnNoW */
+export interface KursChapter {
+  /** 1–12, also the LearnNoW chapter number */
+  n: number
+  title: string
+  titleEn: string
+  level: Level
+  /** situations the chapter's dialogues cover, in English */
+  theme: string
+  /** what you can do after the chapter */
+  canDo: LessonExample[]
+  /** LearnNoW dialogue titles (A–D), linked to ntnu.edu for audio + text */
+  dialogues: string[]
+  /** everyday phrases to learn as chunks */
+  phrases: LessonExample[]
+  /** grammar explained in English, in LearnNoW's order */
+  grammar: LessonSection[]
+  /** one pronunciation focus */
+  pronunciation: LessonSection
+  /** questions to answer out loud — oral practice from day one */
+  speaking: string[]
+  /** chapter check; correct answer is always index 0 */
+  quiz: QuizQuestion[]
+  /** word-order drills */
+  sentences: SentenceExercise[]
+}

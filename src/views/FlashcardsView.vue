@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { vocabulary } from '../data/vocabulary'
+import { chapterByN, chapterFromQuery, chapterWords } from '../data/kurs'
 import { useProgressStore } from '../stores/progress'
 import { isDue } from '../lib/srs'
 import { shuffle } from '../lib/utils'
@@ -9,9 +11,13 @@ import { speakNorwegian, speechAvailable } from '../lib/speech'
 import type { Grade, Level, VocabCard } from '../types'
 
 const progress = useProgressStore()
+const route = useRoute()
+
+/** ?kapittel=N narrows the deck to one Nybegynnerkurs chapter */
+const chapter = computed(() => chapterFromQuery(route.query.kapittel))
 
 const levelFilter = ref<Level | 'alle'>('alle')
-const levels: (Level | 'alle')[] = ['alle', 'A2', 'B1', 'B2']
+const levels: (Level | 'alle')[] = ['alle', 'A1', 'A2', 'B1', 'B2']
 
 const SESSION_SIZE = 20
 
@@ -28,9 +34,9 @@ const mode = ref<'study' | 'learn'>('study')
 const showGenderQuiz = computed(() => genderMode.value && !!current.value?.gender && genderGuess.value === null)
 
 const pool = computed(() =>
-  vocabulary.filter(
-    (v) => levelFilter.value === 'alle' || v.level === levelFilter.value,
-  ),
+  chapter.value
+    ? chapterWords(chapter.value)
+    : vocabulary.filter((v) => levelFilter.value === 'alle' || v.level === levelFilter.value),
 )
 const duePool = computed(() => pool.value.filter((v) => isDue(progress.state.srs[v.id])))
 /** words never seen before — candidates for the learn mode */
@@ -120,6 +126,11 @@ const gradeButtons: { g: Grade; label: string; cls: string }[] = [
       </div>
 
       <div class="card rise rise-2 mt-6 p-6">
+        <div v-if="chapter" class="flex flex-wrap items-center justify-between gap-2">
+          <span class="chip bg-gull-wash text-gull">Kapittel {{ chapter }} · {{ chapterByN(chapter)?.title }}</span>
+          <RouterLink to="/ord" class="text-xs font-bold text-ink-faint no-underline hover:text-fjord">Vis alle nivåer i stedet</RouterLink>
+        </div>
+        <template v-else>
         <p class="mb-3 text-sm font-bold text-ink-soft">Velg nivå</p>
         <div class="flex flex-wrap gap-2">
           <button
@@ -132,6 +143,7 @@ const gradeButtons: { g: Grade; label: string; cls: string }[] = [
             {{ l === 'alle' ? 'Alle nivåer' : l }}
           </button>
         </div>
+        </template>
 
         <hr class="dotted-rule my-5" />
 
@@ -217,6 +229,7 @@ const gradeButtons: { g: Grade; label: string; cls: string }[] = [
       <div class="mt-6 flex items-center justify-between text-xs font-bold text-ink-faint">
         <span>{{ index + 1 }} / {{ session.length }}</span>
         <span class="chip" :class="{
+          'bg-gull-wash text-gull': current.level === 'A1',
           'bg-moss-wash text-moss': current.level === 'A2',
           'bg-fjord-wash text-fjord': current.level === 'B1',
           'bg-rod-wash text-rod-deep': current.level === 'B2',

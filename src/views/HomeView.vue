@@ -17,10 +17,18 @@ const quizAccuracy = computed(() =>
 
 const modules = [
   {
+    to: '/kurs',
+    no: 'Kurs',
+    title: 'Nybegynnerkurs A1–A2',
+    desc: 'Grunnmuren først: 12 kapitler i samme rekkefølge som NTNUs LearnNoW — grammatikk, ord, uttale og muntlige øvelser.',
+    accent: 'gull',
+    number: 'A1',
+  },
+  {
     to: '/laer',
     no: 'Lær',
     title: 'Leksjoner',
-    desc: 'Start her: grammatikk forklart på engelsk og hele pensumet til statsborgerprøven — lær først, test etterpå.',
+    desc: 'Når grunnmuren sitter: B1-grammatikk forklart på engelsk og hele pensumet til statsborgerprøven — lær først, test etterpå.',
     accent: 'moss',
     number: '00',
   },
@@ -28,7 +36,7 @@ const modules = [
     to: '/ord',
     no: 'Ord',
     title: 'Ordforråd',
-    desc: `Flashcards med smart repetisjon. ${vocabulary.length} ord fra A2 til B2 med eksempler og uttale.`,
+    desc: `Flashcards med smart repetisjon. ${vocabulary.length} ord fra A1 til B2 med eksempler og uttale.`,
     accent: 'rod',
     number: '01',
   },
@@ -85,10 +93,11 @@ const modules = [
         <em class="text-fjord">Nå skal vi bevise det.</em>
       </h1>
       <p class="mt-4 max-w-2xl text-ink-soft">
-        Ti år i Norge er verdt mer enn du tror — men prøvene krever system. Denne appen
-        drilller ordforråd, ordstilling og samfunnskunnskap til du består
+        Ti år i Norge er verdt mer enn du tror — men prøvene krever system. Vi bygger
+        grunnmuren fra A1, og så drilller vi ordforråd, ordstilling og samfunnskunnskap til du består
         <strong>muntlig B1</strong> og <strong>statsborgerprøven</strong>.
       </p>
+      <RouterLink to="/kurs" class="btn btn-accent mt-5 inline-flex">Start Nybegynnerkurset →</RouterLink>
     </section>
 
     <!-- stats -->

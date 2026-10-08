@@ -1,4 +1,8 @@
 import type { VocabCard } from '../types'
+import { vocabA1a } from './vocab-a1-1'
+import { vocabA1b } from './vocab-a1-2'
+import { vocabA1c } from './vocab-a1-3'
+import { vocabA1d } from './vocab-a1-4'
 import { vocabA2 } from './vocab-a2'
 import { vocabA2b } from './vocab-a2-2'
 import { vocabA2c } from './vocab-a2-3'
@@ -19,7 +23,7 @@ import { vocabB2f } from './vocab-b2-6'
 import { vocabB2g } from './vocab-b2-7'
 
 /**
- * Core vocabulary for A2 → B2, weighted toward what norskprøven and
+ * Core vocabulary for A2 → B2 (the A1 Nybegynnerkurs words live in vocab-a1-*), weighted toward what norskprøven and
  * everyday Norwegian life actually demand. Genders follow bokmål.
  *
  * IMPORTANT: card ids are referenced by users' SRS progress in Firestore —
@@ -221,6 +225,10 @@ const core: VocabCard[] = [
 ]
 
 export const vocabulary: VocabCard[] = [
+  ...vocabA1a,
+  ...vocabA1b,
+  ...vocabA1c,
+  ...vocabA1d,
   ...core,
   ...vocabA2,
   ...vocabA2b,
