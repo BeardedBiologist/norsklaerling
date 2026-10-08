@@ -7,7 +7,7 @@ import { useJourney } from '../lib/journey'
 
 const progress = useProgressStore()
 const journey = useJourney()
-const journeyPct = computed(() => Math.round((journey.completedSteps.value / journey.totalSteps) * 100))
+const journeyPct = computed(() => Math.round(journey.overall.value * 100))
 
 const learnedPct = computed(() =>
   Math.round((progress.learnedCount / vocabulary.length) * 100),
@@ -122,12 +122,15 @@ const modules = [
           <p class="display mt-3 text-xl font-black text-ink">
             {{ courses[journey.current.value.chapter.course].title }} · kapittel {{ journey.current.value.chapter.n }}: {{ journey.current.value.chapter.title }}
           </p>
-          <p v-if="journey.current.value.step" class="text-sm text-ink-soft">
-            Neste steg: {{ journey.current.value.step.icon }} {{ journey.current.value.step.title }} — {{ journey.current.value.step.detail }}
+          <p v-if="journey.current.value.next" class="text-sm text-ink-soft">
+            Neste: {{ journey.current.value.next.step.icon }} {{ journey.current.value.next.item.label }} · {{ journey.passedCount.value }} av 22 kapitler bestått
           </p>
           <div class="mt-4 flex flex-wrap gap-2">
-            <RouterLink :to="journey.current.value.step?.to ?? `/kurs/${journey.current.value.chapter.id}`" class="btn btn-accent">
-              {{ journey.completedSteps.value === 0 ? 'Start reisen' : 'Fortsett der du slapp' }} →
+            <RouterLink
+              :to="journey.current.value.next ? journey.itemLink(journey.current.value.chapter, journey.current.value.next.item) : `/kurs/${journey.current.value.chapter.id}`"
+              class="btn btn-accent"
+            >
+              {{ journeyPct === 0 ? 'Start reisen' : 'Fortsett der du slapp' }} →
             </RouterLink>
             <RouterLink :to="`/kurs/${journey.current.value.chapter.id}`" class="btn btn-ghost">Åpne kapittelet</RouterLink>
             <RouterLink to="/kurs" class="btn btn-ghost">Se hele reisen</RouterLink>

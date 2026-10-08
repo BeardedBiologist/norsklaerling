@@ -111,7 +111,7 @@ function next() {
   if (index.value + 1 >= session.value.length) {
     done.value = true
     progress.recordQuiz('sentences', score.value, session.value.length)
-    if (chapter.value) progress.recordStep(chapter.value.id, 'bygg', score.value / session.value.length)
+    if (chapter.value) progress.recordStep(chapter.value.id, listenMode.value ? 'bygg-lytt' : 'bygg', score.value / session.value.length)
   } else {
     index.value++
     loadExercise()

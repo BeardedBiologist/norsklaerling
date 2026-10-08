@@ -207,6 +207,11 @@ export const useProgressStore = defineStore('progress', () => {
     if (activity) recordActivity()
   }
 
+  /** undo a hand-ticked item */
+  function clearStep(chapterId: string, step: string) {
+    if (state.kursSteps[chapterId]) delete state.kursSteps[chapterId][step]
+  }
+
   function stepValue(chapterId: string, step: string): number | undefined {
     return state.kursSteps[chapterId]?.[step]
   }
@@ -273,6 +278,7 @@ export const useProgressStore = defineStore('progress', () => {
     markLessonRead,
     isLessonRead,
     recordStep,
+    clearStep,
     stepValue,
     setLastChapter,
     dueCards,

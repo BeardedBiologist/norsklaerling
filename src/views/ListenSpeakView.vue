@@ -213,7 +213,7 @@ function next() {
     else progress.recordActivity()
     if (chapter.value) {
       const result = mode.value === 'fritt' ? 1 : score.value / items.value.length
-      progress.recordStep(chapter.value.id, mode.value === 'diktat' ? 'diktat' : 'snakk', result)
+      progress.recordStep(chapter.value.id, mode.value === 'diktat' ? 'diktat' : `snakk-${mode.value}`, result)
     }
   } else {
     index.value++
