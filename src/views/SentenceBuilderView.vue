@@ -111,6 +111,7 @@ function next() {
   if (index.value + 1 >= session.value.length) {
     done.value = true
     progress.recordQuiz('sentences', score.value, session.value.length)
+    if (chapter.value) progress.recordStep(chapter.value.id, 'bygg', score.value / session.value.length)
   } else {
     index.value++
     loadExercise()
@@ -132,6 +133,7 @@ function next() {
         <p class="mt-2 text-sm text-ink-soft">
           {{ score >= session.length * 0.7 ? 'Solid! Ordstillingen sitter bedre og bedre.' : 'Fortsett å øve — V2-regelen kommer med repetisjon.' }}
         </p>
+        <RouterLink v-if="chapter" :to="`/kurs/${chapter.id}`" class="btn btn-accent mt-4 inline-flex">← Tilbake til kapittelet</RouterLink>
       </div>
 
       <div class="card rise rise-2 mt-6 p-6">

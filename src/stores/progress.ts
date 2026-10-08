@@ -37,10 +37,14 @@ interface PersistedState {
   quizResults: QuizResult[]
   examAttempts: ExamAttempt[]
   readLessons: string[]
+  /** course journey: chapter id → step key → best result (0–1) */
+  kursSteps: Record<string, Record<string, number>>
+  /** the chapter last opened, so «Fortsett» can return to it */
+  lastChapter: string | null
 }
 
 function emptyState(): PersistedState {
-  return { srs: {}, activityDays: [], quizResults: [], examAttempts: [], readLessons: [] }
+  return { srs: {}, activityDays: [], quizResults: [], examAttempts: [], readLessons: [], kursSteps: {}, lastChapter: null }
 }
 
 function load(): PersistedState {
@@ -129,6 +133,9 @@ export const useProgressStore = defineStore('progress', () => {
       if (!seenExam.has(JSON.stringify(a))) state.examAttempts.push(a)
     }
     state.readLessons = [...new Set([...state.readLessons, ...(cloud.readLessons ?? [])])]
+    for (const [chapter, steps] of Object.entries(cloud.kursSteps ?? {}))
+      for (const [step, value] of Object.entries(steps)) recordStep(chapter, step, value, false)
+    state.lastChapter ??= cloud.lastChapter ?? null
   }
 
   // on sign-in: pull cloud state, merge, push the merged result back
@@ -193,6 +200,21 @@ export const useProgressStore = defineStore('progress', () => {
     return state.readLessons.includes(id)
   }
 
+  /** store a journey step result, keeping the best one */
+  function recordStep(chapterId: string, step: string, value: number, activity = true) {
+    const steps = (state.kursSteps[chapterId] ??= {})
+    if ((steps[step] ?? -1) < value) steps[step] = value
+    if (activity) recordActivity()
+  }
+
+  function stepValue(chapterId: string, step: string): number | undefined {
+    return state.kursSteps[chapterId]?.[step]
+  }
+
+  function setLastChapter(chapterId: string) {
+    state.lastChapter = chapterId
+  }
+
   const dueCards = computed(() =>
     vocabulary.filter((v) => isDue(state.srs[v.id])),
   )
@@ -236,6 +258,8 @@ export const useProgressStore = defineStore('progress', () => {
     state.quizResults = []
     state.examAttempts = []
     state.readLessons = []
+    state.kursSteps = {}
+    state.lastChapter = null
   }
 
   return {
@@ -248,6 +272,9 @@ export const useProgressStore = defineStore('progress', () => {
     recordActivity,
     markLessonRead,
     isLessonRead,
+    recordStep,
+    stepValue,
+    setLastChapter,
     dueCards,
     learnedCount,
     seenCount,

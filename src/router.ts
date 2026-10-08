@@ -18,5 +18,9 @@ export const router = createRouter({
     { path: '/boyning', name: 'inflection', component: () => import('./views/InflectionView.vue') },
     { path: '/innstillinger', name: 'settings', component: () => import('./views/SettingsView.vue') },
   ],
-  scrollBehavior: () => ({ top: 0 }),
+  scrollBehavior: (to) =>
+    to.hash
+      ? // lazy-loaded views render after navigation, so wait a moment before looking for the anchor
+        new Promise((resolve) => setTimeout(() => resolve({ el: to.hash, top: 240, behavior: 'smooth' }), 300))
+      : { top: 0 },
 })

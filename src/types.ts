@@ -136,3 +136,12 @@ export interface KursChapter {
   /** word-order drills */
   sentences: SentenceExercise[]
 }
+
+/** one comprehension question about an NTNU text; correct answer is always index 0 */
+export interface ListeningQuestion {
+  q: string
+  /** English translation of the question, for the early chapters */
+  en?: string
+  options: string[]
+  answer: number
+}

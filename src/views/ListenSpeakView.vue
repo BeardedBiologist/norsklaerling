@@ -211,6 +211,10 @@ function next() {
     done.value = true
     if (mode.value !== 'fritt') progress.recordQuiz(mode.value === 'diktat' ? 'dictation' : 'speaking', score.value, items.value.length)
     else progress.recordActivity()
+    if (chapter.value) {
+      const result = mode.value === 'fritt' ? 1 : score.value / items.value.length
+      progress.recordStep(chapter.value.id, mode.value === 'diktat' ? 'diktat' : 'snakk', result)
+    }
   } else {
     index.value++
     resetItem()
@@ -255,6 +259,7 @@ const freeStats = computed(() => {
           </p>
           <p class="mt-2 text-sm text-ink-soft">En setning teller som riktig når minst 90 % av ordene stemmer.</p>
         </template>
+        <RouterLink v-if="chapter" :to="`/kurs/${chapter.id}`" class="btn btn-accent mt-4 inline-flex">← Tilbake til kapittelet</RouterLink>
       </div>
 
       <div class="card rise rise-2 mt-6 p-6">

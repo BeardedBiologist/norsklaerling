@@ -2,8 +2,12 @@
 import { computed } from 'vue'
 import { useProgressStore } from '../stores/progress'
 import { vocabulary } from '../data/vocabulary'
+import { courses } from '../data/kurs'
+import { useJourney } from '../lib/journey'
 
 const progress = useProgressStore()
+const journey = useJourney()
+const journeyPct = computed(() => Math.round((journey.completedSteps.value / journey.totalSteps) * 100))
 
 const learnedPct = computed(() =>
   Math.round((progress.learnedCount / vocabulary.length) * 100),
@@ -19,7 +23,7 @@ const modules = [
   {
     to: '/kurs',
     no: 'Kurs',
-    title: 'Kurs A1 → B1',
+    title: 'Reisen A1 → B1',
     desc: 'Nybegynnerkurs (12 kapitler, etter NTNUs LearnNoW) og B1-kurs (10 kapitler, etter NoW2) — grammatikk, ord, uttale og muntlige øvelser.',
     accent: 'gull',
     number: 'A1',
@@ -105,7 +109,32 @@ const modules = [
         grunnmuren fra A1, og så drilller vi ordforråd, ordstilling og samfunnskunnskap til du består
         <strong>muntlig B1</strong> og <strong>statsborgerprøven</strong>.
       </p>
-      <RouterLink to="/kurs" class="btn btn-accent mt-5 inline-flex">Start Nybegynnerkurset →</RouterLink>
+      <!-- the journey: pick up exactly where you left off -->
+      <div class="card mt-6 max-w-2xl border-l-4 border-l-gull p-5">
+        <div class="flex items-center justify-between text-sm font-bold">
+          <span class="kicker">Reisen din</span>
+          <span class="text-ink-faint">{{ journeyPct }} % fullført</span>
+        </div>
+        <div class="mt-2 h-2 overflow-hidden rounded-full bg-paper-warm">
+          <div class="h-full rounded-full bg-moss" :style="{ width: journeyPct + '%' }" />
+        </div>
+        <template v-if="journey.current.value">
+          <p class="display mt-3 text-xl font-black text-ink">
+            {{ courses[journey.current.value.chapter.course].title }} · kapittel {{ journey.current.value.chapter.n }}: {{ journey.current.value.chapter.title }}
+          </p>
+          <p v-if="journey.current.value.step" class="text-sm text-ink-soft">
+            Neste steg: {{ journey.current.value.step.icon }} {{ journey.current.value.step.title }} — {{ journey.current.value.step.detail }}
+          </p>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <RouterLink :to="journey.current.value.step?.to ?? `/kurs/${journey.current.value.chapter.id}`" class="btn btn-accent">
+              {{ journey.completedSteps.value === 0 ? 'Start reisen' : 'Fortsett der du slapp' }} →
+            </RouterLink>
+            <RouterLink :to="`/kurs/${journey.current.value.chapter.id}`" class="btn btn-ghost">Åpne kapittelet</RouterLink>
+            <RouterLink to="/kurs" class="btn btn-ghost">Se hele reisen</RouterLink>
+          </div>
+        </template>
+        <p v-else class="mt-3 font-bold text-moss">Hele reisen er fullført! 🎉</p>
+      </div>
     </section>
 
     <!-- stats -->

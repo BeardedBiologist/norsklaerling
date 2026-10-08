@@ -62,6 +62,7 @@ function next() {
   if (index.value + 1 >= session.value.length) {
     done.value = true
     progress.recordQuiz('grammar', score.value, session.value.length)
+    if (chapter.value) progress.recordStep(chapter.value.id, 'sjekk', score.value / session.value.length)
   } else {
     index.value++
     selected.value = null
@@ -89,6 +90,7 @@ function optionClass(i: number): string {
         <p class="mt-2 text-sm text-ink-soft">
           {{ score >= session.length * 0.7 ? 'Sterkt! Dette lover godt for norskprøven.' : 'Les forklaringene nøye — reglene setter seg etter hvert.' }}
         </p>
+        <RouterLink v-if="chapter" :to="`/kurs/${chapter.id}`" class="btn btn-accent mt-4 inline-flex">← Tilbake til kapittelet</RouterLink>
       </div>
 
       <div class="card rise rise-2 mt-6 p-6">

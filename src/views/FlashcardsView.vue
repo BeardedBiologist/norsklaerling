@@ -124,6 +124,7 @@ const gradeButtons: { g: Grade; label: string; cls: string }[] = [
         <p v-if="mode === 'learn' && graded.again > 0" class="mt-1 text-xs text-ink-faint">
           Ordene i øvingskøen dukker opp i «Repeter»-økten om noen minutter.
         </p>
+        <RouterLink v-if="chapter" :to="`/kurs/${chapter.id}`" class="btn btn-accent mt-4 inline-flex">← Tilbake til kapittelet</RouterLink>
       </div>
 
       <div class="card rise rise-2 mt-6 p-6">

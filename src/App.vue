@@ -18,7 +18,7 @@ const syncLabel: Record<string, string> = {
 
 const nav = [
   { to: '/', label: 'Hjem', name: 'home' },
-  { to: '/kurs', label: 'Kurs', name: 'kurs' },
+  { to: '/kurs', label: 'Reisen', name: 'kurs' },
   { to: '/laer', label: 'Lær', name: 'learn' },
   { to: '/ord', label: 'Ord', name: 'flashcards' },
   { to: '/setninger', label: 'Setninger', name: 'sentences' },
