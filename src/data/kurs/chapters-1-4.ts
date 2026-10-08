@@ -7,6 +7,8 @@ import type { KursChapter } from '../../types'
  */
 export const chapters1to4: KursChapter[] = [
   {
+    id: '1',
+    course: 'nybegynner',
     n: 1,
     title: 'Hei! Hva heter du?',
     titleEn: 'Hi! What’s your name?',
@@ -92,6 +94,8 @@ export const chapters1to4: KursChapter[] = [
   },
 
   {
+    id: '2',
+    course: 'nybegynner',
     n: 2,
     title: 'På reise',
     titleEn: 'Travelling',
@@ -204,6 +208,8 @@ export const chapters1to4: KursChapter[] = [
   },
 
   {
+    id: '3',
+    course: 'nybegynner',
     n: 3,
     title: 'Hjemme',
     titleEn: 'At home',
@@ -313,6 +319,8 @@ export const chapters1to4: KursChapter[] = [
   },
 
   {
+    id: '4',
+    course: 'nybegynner',
     n: 4,
     title: 'Familie og hverdag',
     titleEn: 'Family and everyday life',

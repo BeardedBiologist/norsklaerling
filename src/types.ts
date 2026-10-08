@@ -22,8 +22,8 @@ export interface VocabCard {
   exampleEn: string
   level: Level
   topic: string
-  /** Nybegynnerkurs chapter (1–12) that introduces the word */
-  chapter?: number
+  /** id of the course chapter that introduces the word (see KursChapter.id) */
+  chapter?: string
 }
 
 export interface SentenceExercise {
@@ -104,9 +104,15 @@ export interface SrsState {
 
 export type Grade = 'again' | 'hard' | 'good' | 'easy'
 
-/** one chapter of the A1–A2 Nybegynnerkurs, sequenced after NTNU LearnNoW */
+/** nybegynner = A1–A2 after NTNU LearnNoW · b1 = A2–B1 after NTNU NoW2 */
+export type KursCourse = 'nybegynner' | 'b1'
+
+/** one chapter of a course, sequenced after the matching NTNU course */
 export interface KursChapter {
-  /** 1–12, also the LearnNoW chapter number */
+  /** unique id used in URLs, progress and VocabCard.chapter: '3' or 'b1-3' */
+  id: string
+  course: KursCourse
+  /** chapter number within the course, also NTNU's chapter number */
   n: number
   title: string
   titleEn: string
@@ -115,7 +121,7 @@ export interface KursChapter {
   theme: string
   /** what you can do after the chapter */
   canDo: LessonExample[]
-  /** LearnNoW dialogue titles (A–D), linked to ntnu.edu for audio + text */
+  /** NTNU text titles in order (LearnNoW: A–D, NoW2: A, B, X), linked for audio + text */
   dialogues: string[]
   /** everyday phrases to learn as chunks */
   phrases: LessonExample[]

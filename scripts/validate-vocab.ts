@@ -47,7 +47,7 @@ for (const c of vocabulary) {
     warnings.push(`noun without gender: ${where}`)
   for (const f of ['no', 'en', 'example', 'exampleEn'] as const)
     if (!c[f]?.trim()) errors.push(`EMPTY FIELD ${f}: ${where}`)
-  if (c.chapter !== undefined && !(Number.isInteger(c.chapter) && c.chapter >= 1 && c.chapter <= 12))
+  if (c.chapter !== undefined && !/^(b1-)?\d{1,2}$/.test(c.chapter))
     errors.push(`BAD CHAPTER "${c.chapter}": ${where}`)
   if (/^(en|ei|et) /.test(c.no) && c.type === 'substantiv')
     warnings.push(`headword still has article: ${where}`)

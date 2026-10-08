@@ -6,7 +6,7 @@ export const router = createRouter({
   routes: [
     { path: '/', name: 'home', component: HomeView },
     { path: '/kurs', name: 'kurs', component: () => import('./views/KursView.vue') },
-    { path: '/kurs/:n', name: 'kurs-chapter', component: () => import('./views/KursChapterView.vue') },
+    { path: '/kurs/:id', name: 'kurs-chapter', component: () => import('./views/KursChapterView.vue') },
     { path: '/laer', name: 'learn', component: () => import('./views/LearnView.vue') },
     { path: '/laer/:id', name: 'lesson', component: () => import('./views/LessonView.vue') },
     { path: '/ord', name: 'flashcards', component: () => import('./views/FlashcardsView.vue') },

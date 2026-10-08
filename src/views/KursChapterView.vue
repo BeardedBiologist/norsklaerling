@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { chapterByN, chapterWords, kurs, kursLessonId, ntnuLinks } from '../data/kurs'
+import { chapterById, chapterWords, chaptersOf, courses, kursLessonId, ntnuLinks, siblingChapter } from '../data/kurs'
 import { useProgressStore } from '../stores/progress'
 import { isLearned } from '../lib/srs'
 import { speakNorwegian, speechAvailable } from '../lib/speech'
@@ -9,29 +9,30 @@ import { speakNorwegian, speechAvailable } from '../lib/speech'
 const route = useRoute()
 const progress = useProgressStore()
 
-const chapter = computed(() => chapterByN(Number(route.params.n)))
-const links = computed(() => (chapter.value ? ntnuLinks(chapter.value.n) : null))
-const words = computed(() => (chapter.value ? chapterWords(chapter.value.n) : []))
+const chapter = computed(() => chapterById(String(route.params.id)))
+const course = computed(() => (chapter.value ? courses[chapter.value.course] : null))
+const courseLength = computed(() => (chapter.value ? chaptersOf(chapter.value.course).length : 0))
+const courseHome = computed(() => (chapter.value?.course === 'b1' ? '/kurs?kurs=b1' : '/kurs'))
+const links = computed(() => (chapter.value ? ntnuLinks(chapter.value) : null))
+const words = computed(() => (chapter.value ? chapterWords(chapter.value) : []))
 const learnedWords = computed(() => words.value.filter((w) => isLearned(progress.state.srs[w.id])).length)
 const showAllWords = ref(false)
 const shownWords = computed(() => (showAllWords.value ? words.value : words.value.slice(0, 24)))
 
-const prev = computed(() => (chapter.value ? chapterByN(chapter.value.n - 1) : undefined))
-const next = computed(() => (chapter.value ? chapterByN(chapter.value.n + 1) : undefined))
-const isDone = computed(() => !!chapter.value && progress.isLessonRead(kursLessonId(chapter.value.n)))
+const prev = computed(() => (chapter.value ? siblingChapter(chapter.value, -1) : undefined))
+const next = computed(() => (chapter.value ? siblingChapter(chapter.value, 1) : undefined))
+const isDone = computed(() => !!chapter.value && progress.isLessonRead(kursLessonId(chapter.value)))
 
 function finish() {
-  if (chapter.value) progress.markLessonRead(kursLessonId(chapter.value.n))
+  if (chapter.value) progress.markLessonRead(kursLessonId(chapter.value))
 }
-
-const letters = ['A', 'B', 'C', 'D']
 </script>
 
 <template>
-  <div v-if="chapter && links" class="mx-auto max-w-2xl">
-    <RouterLink to="/kurs" class="text-sm font-bold text-ink-faint no-underline hover:text-fjord">← Alle kapitler</RouterLink>
+  <div v-if="chapter && links && course" class="mx-auto max-w-2xl">
+    <RouterLink :to="courseHome" class="text-sm font-bold text-ink-faint no-underline hover:text-fjord">← Alle kapitler</RouterLink>
 
-    <p class="kicker rise rise-1 mt-4">Kapittel {{ chapter.n }} av {{ kurs.length }} · {{ chapter.level }}</p>
+    <p class="kicker rise rise-1 mt-4">{{ course.title }} · kapittel {{ chapter.n }} av {{ courseLength }} · {{ chapter.level }}</p>
     <h1 class="display rise rise-1 mt-1 text-3xl font-black text-ink">{{ chapter.title }}</h1>
     <p class="rise rise-1 text-ink-faint">{{ chapter.titleEn }} — {{ chapter.theme }}</p>
 
@@ -50,7 +51,7 @@ const letters = ['A', 'B', 'C', 'D']
     <section class="card rise rise-2 mt-6 p-6">
       <h2 class="display text-xl font-black text-ink"><span class="text-ink-faint">1 ·</span> Lytt</h2>
       <p class="mt-1 text-sm text-ink-soft">
-        Dialogene med tekst og lyd ligger hos NTNU LearnNoW. Hør hver dialog to ganger: først uten tekst, så med.
+        Tekstene med lyd ligger hos NTNU {{ course.source.name }}. Hør hver tekst to ganger: først uten å lese, så med.
       </p>
       <div class="mt-4 grid gap-2 sm:grid-cols-2">
         <a
@@ -61,16 +62,16 @@ const letters = ['A', 'B', 'C', 'D']
           rel="noopener"
           class="flex items-center gap-3 rounded-lg border border-rule bg-paper px-3 py-2 text-sm no-underline hover:border-fjord"
         >
-          <span class="display font-black text-fjord">{{ letters[i] }}</span>
+          <span class="display font-black text-fjord">{{ course.dialogueLetters[i] }}</span>
           <span class="font-bold text-ink">{{ title }}</span>
           <span class="ml-auto text-ink-faint">↗</span>
         </a>
       </div>
       <p class="mt-3 text-xs text-ink-faint">
         Mer hos NTNU:
-        <a :href="links.listening" target="_blank" rel="noopener" class="text-fjord">lytteøvelser</a> ·
-        <a :href="links.pronunciation" target="_blank" rel="noopener" class="text-fjord">uttale</a> ·
-        <a :href="links.grammar" target="_blank" rel="noopener" class="text-fjord">deres grammatikk</a>
+        <template v-for="(x, i) in links.extras" :key="x.url">
+          <a :href="x.url" target="_blank" rel="noopener" class="text-fjord">{{ x.label }}</a><span v-if="i < links.extras.length - 1"> · </span>
+        </template>
       </p>
     </section>
 
@@ -136,7 +137,7 @@ const letters = ['A', 'B', 'C', 'D']
           + {{ words.length - shownWords.length }} til
         </button>
       </div>
-      <RouterLink :to="{ path: '/ord', query: { kapittel: chapter.n } }" class="btn btn-primary mt-4 inline-flex">
+      <RouterLink :to="{ path: '/ord', query: { kapittel: chapter.id } }" class="btn btn-primary mt-4 inline-flex">
         Lær kapittelets ord →
       </RouterLink>
     </section>
@@ -159,10 +160,10 @@ const letters = ['A', 'B', 'C', 'D']
     <section class="card rise rise-5 mt-6 p-6">
       <h2 class="display text-xl font-black text-ink"><span class="text-ink-faint">5 ·</span> Test deg</h2>
       <div class="mt-3 flex flex-wrap gap-2">
-        <RouterLink :to="{ path: '/quiz', query: { kapittel: chapter.n } }" class="btn btn-accent">
+        <RouterLink :to="{ path: '/quiz', query: { kapittel: chapter.id } }" class="btn btn-accent">
           Kapittelsjekk ({{ chapter.quiz.length }} spørsmål) →
         </RouterLink>
-        <RouterLink :to="{ path: '/setninger', query: { kapittel: chapter.n } }" class="btn btn-ghost">
+        <RouterLink :to="{ path: '/setninger', query: { kapittel: chapter.id } }" class="btn btn-ghost">
           Bygg setninger ({{ chapter.sentences.length }}) →
         </RouterLink>
       </div>
@@ -170,20 +171,20 @@ const letters = ['A', 'B', 'C', 'D']
       <div class="flex flex-wrap items-center gap-3">
         <button v-if="!isDone" class="btn btn-primary" @click="finish">✓ Merk kapittelet som ferdig</button>
         <span v-else class="chip bg-moss-wash text-moss">Kapittel fullført ✓</span>
-        <RouterLink v-if="next" :to="`/kurs/${next.n}`" class="text-sm font-bold text-fjord no-underline hover:underline">
+        <RouterLink v-if="next" :to="`/kurs/${next.id}`" class="text-sm font-bold text-fjord no-underline hover:underline">
           Neste: {{ next.title }} →
         </RouterLink>
       </div>
     </section>
 
     <div class="mt-6 flex justify-between text-sm font-bold">
-      <RouterLink v-if="prev" :to="`/kurs/${prev.n}`" class="text-ink-faint no-underline hover:text-fjord">← {{ prev.title }}</RouterLink>
+      <RouterLink v-if="prev" :to="`/kurs/${prev.id}`" class="text-ink-faint no-underline hover:text-fjord">← {{ prev.title }}</RouterLink>
       <span v-else />
-      <RouterLink v-if="next" :to="`/kurs/${next.n}`" class="text-ink-faint no-underline hover:text-fjord">{{ next.title }} →</RouterLink>
+      <RouterLink v-if="next" :to="`/kurs/${next.id}`" class="text-ink-faint no-underline hover:text-fjord">{{ next.title }} →</RouterLink>
     </div>
 
     <p class="mt-8 text-center text-xs text-ink-faint">
-      Rekkefølgen følger NTNUs gratiskurs LearnNoW. Dialoger og lyd © NTNU — forklaringer, eksempler og øvelser her er laget for NorskLærling.
+      Rekkefølgen følger NTNUs gratiskurs {{ course.source.name }}. Tekster og lyd © NTNU — forklaringer, eksempler og øvelser her er laget for NorskLærling.
     </p>
   </div>
 

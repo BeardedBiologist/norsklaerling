@@ -3,6 +3,8 @@ import type { KursChapter } from '../../types'
 /** Nybegynnerkurs chapters 9–12 — see chapters-1-4.ts for the approach. */
 export const chapters9to12: KursChapter[] = [
   {
+    id: '9',
+    course: 'nybegynner',
     n: 9,
     title: 'På tur og på jobb',
     titleEn: 'Trips and work',
@@ -86,6 +88,8 @@ export const chapters9to12: KursChapter[] = [
   },
 
   {
+    id: '10',
+    course: 'nybegynner',
     n: 10,
     title: 'Helse og sport',
     titleEn: 'Health and sport',
@@ -181,6 +185,8 @@ export const chapters9to12: KursChapter[] = [
   },
 
   {
+    id: '11',
+    course: 'nybegynner',
     n: 11,
     title: 'Kultur og hytteliv',
     titleEn: 'Culture and cabin life',
@@ -260,6 +266,8 @@ export const chapters9to12: KursChapter[] = [
   },
 
   {
+    id: '12',
+    course: 'nybegynner',
     n: 12,
     title: 'Jul i Norge',
     titleEn: 'Christmas in Norway',

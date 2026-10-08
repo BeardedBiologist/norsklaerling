@@ -10,6 +10,8 @@ import { vocabA2d } from './vocab-a2-4'
 import { vocabA2e } from './vocab-a2-5'
 import { vocabA2f } from './vocab-a2-6'
 import { vocabB1 } from './vocab-b1'
+import { vocabB1kA } from './vocab-b1k-1'
+import { vocabB1kB } from './vocab-b1k-2'
 import { vocabB1b } from './vocab-b1-2'
 import { vocabB1c } from './vocab-b1-3'
 import { vocabB1d } from './vocab-b1-4'
@@ -241,6 +243,8 @@ export const vocabulary: VocabCard[] = [
   ...vocabB1c,
   ...vocabB1d,
   ...vocabB1e,
+  ...vocabB1kA,
+  ...vocabB1kB,
   ...vocabB2,
   ...vocabB2b,
   ...vocabB2c,

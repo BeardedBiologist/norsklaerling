@@ -19,8 +19,8 @@ const modules = [
   {
     to: '/kurs',
     no: 'Kurs',
-    title: 'Nybegynnerkurs A1–A2',
-    desc: 'Grunnmuren først: 12 kapitler i samme rekkefølge som NTNUs LearnNoW — grammatikk, ord, uttale og muntlige øvelser.',
+    title: 'Kurs A1 → B1',
+    desc: 'Nybegynnerkurs (12 kapitler, etter NTNUs LearnNoW) og B1-kurs (10 kapitler, etter NoW2) — grammatikk, ord, uttale og muntlige øvelser.',
     accent: 'gull',
     number: 'A1',
   },

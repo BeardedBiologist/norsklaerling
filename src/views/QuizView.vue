@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { grammarQuiz } from '../data/grammarQuiz'
-import { chapterByN, chapterFromQuery, kursQuiz } from '../data/kurs'
+import { chapterFromQuery, chapterLabel, kursQuiz } from '../data/kurs'
 import { useProgressStore } from '../stores/progress'
 import { permutation, shuffle } from '../lib/utils'
 import type { Level, QuizQuestion } from '../types'
@@ -10,7 +10,7 @@ import type { Level, QuizQuestion } from '../types'
 const progress = useProgressStore()
 const route = useRoute()
 
-/** ?kapittel=N runs that Nybegynnerkurs chapter's check */
+/** ?kapittel=<id> runs that course chapter's check */
 const chapter = computed(() => chapterFromQuery(route.query.kapittel))
 
 const levelFilter = ref<Level | 'alle'>('alle')
@@ -32,7 +32,7 @@ const current = computed(() => session.value[index.value])
 
 function start() {
   const pool = chapter.value
-    ? chapterByN(chapter.value)!.quiz
+    ? chapter.value.quiz
     : [...kursQuiz, ...grammarQuiz].filter(
         (q) => levelFilter.value === 'alle' || q.level === levelFilter.value,
       )
@@ -93,7 +93,7 @@ function optionClass(i: number): string {
 
       <div class="card rise rise-2 mt-6 p-6">
         <div v-if="chapter" class="flex flex-wrap items-center justify-between gap-2">
-          <span class="chip bg-gull-wash text-gull">Kapittel {{ chapter }} · {{ chapterByN(chapter)?.title }}</span>
+          <span class="chip bg-gull-wash text-gull">{{ chapterLabel(chapter) }}</span>
           <RouterLink to="/quiz" class="text-xs font-bold text-ink-faint no-underline hover:text-fjord">Vis alle nivåer i stedet</RouterLink>
         </div>
         <template v-else>

@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { sentences } from '../data/sentences'
-import { chapterByN, chapterFromQuery, kursSentences } from '../data/kurs'
+import { chapterFromQuery, chapterLabel, kursSentences } from '../data/kurs'
 import { useProgressStore } from '../stores/progress'
 import { shuffle } from '../lib/utils'
 import { speakNorwegian, speechAvailable } from '../lib/speech'
@@ -11,7 +11,7 @@ import type { Level, SentenceExercise } from '../types'
 const progress = useProgressStore()
 const route = useRoute()
 
-/** ?kapittel=N drills only that Nybegynnerkurs chapter */
+/** ?kapittel=<id> drills only that course chapter */
 const chapter = computed(() => chapterFromQuery(route.query.kapittel))
 
 const levelFilter = ref<Level | 'alle'>('alle')
@@ -47,7 +47,7 @@ function loadExercise() {
 
 function start() {
   const pool = chapter.value
-    ? chapterByN(chapter.value)!.sentences
+    ? chapter.value.sentences
     : [...kursSentences, ...sentences].filter(
         (s) => levelFilter.value === 'alle' || s.level === levelFilter.value,
       )
@@ -128,7 +128,7 @@ function next() {
 
       <div class="card rise rise-2 mt-6 p-6">
         <div v-if="chapter" class="flex flex-wrap items-center justify-between gap-2">
-          <span class="chip bg-gull-wash text-gull">Kapittel {{ chapter }} · {{ chapterByN(chapter)?.title }}</span>
+          <span class="chip bg-gull-wash text-gull">{{ chapterLabel(chapter) }}</span>
           <RouterLink to="/setninger" class="text-xs font-bold text-ink-faint no-underline hover:text-fjord">Vis alle nivåer i stedet</RouterLink>
         </div>
         <template v-else>

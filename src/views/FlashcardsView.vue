@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { vocabulary } from '../data/vocabulary'
-import { chapterByN, chapterFromQuery, chapterWords } from '../data/kurs'
+import { chapterFromQuery, chapterLabel, chapterWords } from '../data/kurs'
 import { useProgressStore } from '../stores/progress'
 import { isDue } from '../lib/srs'
 import { shuffle } from '../lib/utils'
@@ -13,7 +13,7 @@ import type { Grade, Level, VocabCard } from '../types'
 const progress = useProgressStore()
 const route = useRoute()
 
-/** ?kapittel=N narrows the deck to one Nybegynnerkurs chapter */
+/** ?kapittel=<id> narrows the deck to one course chapter */
 const chapter = computed(() => chapterFromQuery(route.query.kapittel))
 
 const levelFilter = ref<Level | 'alle'>('alle')
@@ -127,7 +127,7 @@ const gradeButtons: { g: Grade; label: string; cls: string }[] = [
 
       <div class="card rise rise-2 mt-6 p-6">
         <div v-if="chapter" class="flex flex-wrap items-center justify-between gap-2">
-          <span class="chip bg-gull-wash text-gull">Kapittel {{ chapter }} · {{ chapterByN(chapter)?.title }}</span>
+          <span class="chip bg-gull-wash text-gull">{{ chapterLabel(chapter) }}</span>
           <RouterLink to="/ord" class="text-xs font-bold text-ink-faint no-underline hover:text-fjord">Vis alle nivåer i stedet</RouterLink>
         </div>
         <template v-else>
