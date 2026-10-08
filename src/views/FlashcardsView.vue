@@ -8,6 +8,7 @@ import { isDue } from '../lib/srs'
 import { shuffle } from '../lib/utils'
 import { inflectionLine } from '../lib/inflections'
 import { speakNorwegian, speechAvailable } from '../lib/speech'
+import { canSpeakCard, speakCard, wordAudioUrl } from '../lib/audio'
 import type { Grade, Level, VocabCard } from '../types'
 
 const progress = useProgressStore()
@@ -199,7 +200,7 @@ const gradeButtons: { g: Grade; label: string; cls: string }[] = [
         <p class="display text-center text-4xl font-black text-ink">
           <span v-if="current.gender" class="text-ink-faint">{{ current.gender }}&nbsp;</span>{{ current.no }}
         </p>
-        <button v-if="speechAvailable()" class="btn btn-ghost !py-1" @click="speakNorwegian(current.no)">🔊 Hør ordet</button>
+        <button v-if="canSpeakCard(current)" class="btn btn-ghost !py-1" :title="wordAudioUrl(current) ? 'Opptak fra NTNU' : 'Syntetisk stemme'" @click="speakCard(current)">🔊 Hør ordet</button>
 
         <p class="display text-2xl font-black text-fjord">{{ current.en }}</p>
         <p v-if="inflectionLine(current)" class="text-center text-sm font-medium text-ink-soft">
@@ -283,8 +284,12 @@ const gradeButtons: { g: Grade; label: string; cls: string }[] = [
           <p v-if="inflectionLine(current)" class="text-center text-sm font-medium text-ink-soft">
             {{ inflectionLine(current) }}
           </p>
+          <button v-if="canSpeakCard(current)" class="btn btn-ghost !py-1 text-sm" @click="speakCard(current)">🔊 Hør ordet</button>
           <hr class="dotted-rule w-24" />
-          <p class="text-center italic text-ink">«{{ current.example }}»</p>
+          <p class="text-center italic text-ink">
+            «{{ current.example }}»
+            <button v-if="speechAvailable()" class="ml-1 text-sm not-italic" title="Hør setningen" @click="speakNorwegian(current.example)">🔊</button>
+          </p>
           <p class="text-center text-sm text-ink-faint">{{ current.exampleEn }}</p>
         </template>
       </div>

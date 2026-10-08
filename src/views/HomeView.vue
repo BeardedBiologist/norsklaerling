@@ -65,6 +65,14 @@ const modules = [
     number: '04',
   },
   {
+    to: '/lytt',
+    no: 'Lytt',
+    title: 'Lytt og snakk',
+    desc: 'Diktat, hør-og-gjenta, si det på norsk og fri muntlig trening med mikrofon — med tilbakemelding ord for ord.',
+    accent: 'moss',
+    number: '07',
+  },
+  {
     to: '/oversett',
     no: 'Oversett',
     title: 'Oversettelse',

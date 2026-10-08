@@ -5,6 +5,8 @@ import { chapterById, chapterWords, chaptersOf, courses, kursLessonId, ntnuLinks
 import { useProgressStore } from '../stores/progress'
 import { isLearned } from '../lib/srs'
 import { speakNorwegian, speechAvailable } from '../lib/speech'
+import { dialogueAudioUrls, speakCard } from '../lib/audio'
+import AudioPlayer from '../components/AudioPlayer.vue'
 
 const route = useRoute()
 const progress = useProgressStore()
@@ -14,6 +16,7 @@ const course = computed(() => (chapter.value ? courses[chapter.value.course] : n
 const courseLength = computed(() => (chapter.value ? chaptersOf(chapter.value.course).length : 0))
 const courseHome = computed(() => (chapter.value?.course === 'b1' ? '/kurs?kurs=b1' : '/kurs'))
 const links = computed(() => (chapter.value ? ntnuLinks(chapter.value) : null))
+const audioUrls = computed(() => (chapter.value ? dialogueAudioUrls(chapter.value) : []))
 const words = computed(() => (chapter.value ? chapterWords(chapter.value) : []))
 const learnedWords = computed(() => words.value.filter((w) => isLearned(progress.state.srs[w.id])).length)
 const showAllWords = ref(false)
@@ -51,21 +54,19 @@ function finish() {
     <section class="card rise rise-2 mt-6 p-6">
       <h2 class="display text-xl font-black text-ink"><span class="text-ink-faint">1 ·</span> Lytt</h2>
       <p class="mt-1 text-sm text-ink-soft">
-        Tekstene med lyd ligger hos NTNU {{ course.source.name }}. Hør hver tekst to ganger: først uten å lese, så med.
+        Hør hver tekst to ganger: først bare med ørene, så én gang til på 0,75× hvis det går fort.
+        Lyden er NTNUs egne opptak fra {{ course.source.name }}.
       </p>
-      <div class="mt-4 grid gap-2 sm:grid-cols-2">
-        <a
-          v-for="(title, i) in chapter.dialogues"
-          :key="i"
-          :href="links.dialogues[i]"
-          target="_blank"
-          rel="noopener"
-          class="flex items-center gap-3 rounded-lg border border-rule bg-paper px-3 py-2 text-sm no-underline hover:border-fjord"
-        >
-          <span class="display font-black text-fjord">{{ course.dialogueLetters[i] }}</span>
-          <span class="font-bold text-ink">{{ title }}</span>
-          <span class="ml-auto text-ink-faint">↗</span>
-        </a>
+      <div class="mt-4 space-y-2">
+        <div v-for="(title, i) in chapter.dialogues" :key="i">
+          <AudioPlayer :src="audioUrls[i]" :label="title" :letter="course.dialogueLetters[i]" />
+          <a
+            :href="links.dialogues[i]"
+            target="_blank"
+            rel="noopener"
+            class="ml-1 mt-0.5 inline-block text-xs text-ink-faint no-underline hover:text-fjord"
+          >Les teksten hos NTNU ↗</a>
+        </div>
       </div>
       <p class="mt-3 text-xs text-ink-faint">
         Mer hos NTNU:
@@ -120,15 +121,16 @@ function finish() {
         <span class="text-sm font-bold text-ink-faint">{{ learnedWords }} / {{ words.length }} lært</span>
       </div>
       <div class="mt-3 flex flex-wrap gap-1.5">
-        <span
+        <button
           v-for="w in shownWords"
           :key="w.id"
-          class="chip border border-rule"
+          class="chip border border-rule hover:border-fjord"
           :class="progress.state.srs[w.id] ? 'bg-moss-wash text-moss' : 'bg-card text-ink-soft'"
-          :title="w.en"
+          :title="`${w.en} — klikk for å høre`"
+          @click="speakCard(w)"
         >
           {{ w.gender ? `${w.gender} ` : '' }}{{ w.no }}
-        </span>
+        </button>
         <button
           v-if="words.length > shownWords.length"
           class="chip border border-dashed border-rule bg-card text-ink-faint"
@@ -146,7 +148,8 @@ function finish() {
     <section class="card rise rise-4 mt-6 border-l-4 border-l-moss p-6">
       <h2 class="display text-xl font-black text-ink"><span class="text-ink-faint">4 ·</span> Snakk</h2>
       <p class="mt-1 text-sm text-ink-soft">
-        Svar høyt, i hele setninger. Ta opp deg selv på mobilen og hør etter: står verbet på plass to?
+        Svar høyt, i hele setninger. I «Snakk fritt» hører du spørsmålet, svarer inn i mikrofonen,
+        og får se det du sa skrevet ut — så kan du høre på deg selv og sjekke: står verbet på plass to?
       </p>
       <ol class="mt-3 list-decimal space-y-1.5 pl-5">
         <li v-for="(q, i) in chapter.speaking" :key="i" class="font-bold text-ink">
@@ -154,6 +157,9 @@ function finish() {
           <button v-if="speechAvailable()" class="ml-1 text-xs font-normal" title="Hør spørsmålet" @click="speakNorwegian(q)">🔊</button>
         </li>
       </ol>
+      <RouterLink :to="{ path: '/lytt', query: { kapittel: chapter.id, modus: 'fritt' } }" class="btn btn-primary mt-4 inline-flex">
+        🎙 Snakk fritt →
+      </RouterLink>
     </section>
 
     <!-- 5 test -->
@@ -165,6 +171,15 @@ function finish() {
         </RouterLink>
         <RouterLink :to="{ path: '/setninger', query: { kapittel: chapter.id } }" class="btn btn-ghost">
           Bygg setninger ({{ chapter.sentences.length }}) →
+        </RouterLink>
+        <RouterLink :to="{ path: '/setninger', query: { kapittel: chapter.id, lytt: '1' } }" class="btn btn-ghost">
+          🎧 Hør og bygg →
+        </RouterLink>
+        <RouterLink :to="{ path: '/lytt', query: { kapittel: chapter.id, modus: 'diktat' } }" class="btn btn-ghost">
+          ✍️ Diktat →
+        </RouterLink>
+        <RouterLink :to="{ path: '/lytt', query: { kapittel: chapter.id, modus: 'si' } }" class="btn btn-ghost">
+          🎙 Si det på norsk →
         </RouterLink>
       </div>
       <hr class="dotted-rule my-5" />

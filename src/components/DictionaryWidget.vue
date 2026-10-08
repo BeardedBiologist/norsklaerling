@@ -3,6 +3,7 @@ import { nextTick, ref } from 'vue'
 import { vocabulary } from '../data/vocabulary'
 import { lookupOrdbok, ordbokUrl, type OrdbokEntry } from '../lib/ordbok'
 import { speakNorwegian, speechAvailable } from '../lib/speech'
+import { canSpeakCard, speakCard } from '../lib/audio'
 import { inflectionLine } from '../lib/inflections'
 import type { VocabCard } from '../types'
 
@@ -131,7 +132,7 @@ function clearHistory() {
             <div class="flex items-baseline justify-between gap-2">
               <p class="font-bold text-ink">
                 <span v-if="c.gender" class="text-ink-faint">{{ c.gender }}&nbsp;</span>{{ c.no }}
-                <button v-if="speechAvailable()" class="ml-1 text-sm" title="Hør uttalen" @click="speakNorwegian(c.no)">🔊</button>
+                <button v-if="canSpeakCard(c)" class="ml-1 text-sm" title="Hør uttalen" @click="speakCard(c)">🔊</button>
               </p>
               <span class="chip shrink-0" :class="{
                 'bg-gull-wash text-gull': c.level === 'A1',

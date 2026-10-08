@@ -15,6 +15,7 @@ and the [statsborgerprøven](https://prove.hkdir.no/en/norwegian-citizenship-tes
 | `/ord` | Ordforråd | 2000+ flashcards (A2–B2) with SM-2 spaced repetition, example sentences and Norwegian text-to-speech |
 | `/setninger` | Setningsbygging | 120 word-tile sentence drills for V2 inversion, `ikke` placement, subordinate clauses |
 | `/quiz` | Grammatikkquiz | 40 norskprøve-style multiple-choice grammar questions with explanations |
+| `/lytt` | Lytt og snakk | Dictation, hear-and-repeat, say-it-in-Norwegian (graded word by word via the browser's speech recognition) and free speaking with recording + transcript. Chapter dialogues and ~1,700 word pronunciations stream NTNU's own recordings from hf.ntnu.no (`src/lib/audio.ts`, `word-audio.json`) |
 | `/statsborger` | Statsborgerprøven | Practice mode with English aid + full exam simulation (36 questions, 60-minute timer, pass at 24) |
 
 Progress (SRS schedule, streak, quiz history, exam attempts) persists in

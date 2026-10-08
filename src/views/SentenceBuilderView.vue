@@ -14,6 +14,9 @@ const route = useRoute()
 /** ?kapittel=<id> drills only that course chapter */
 const chapter = computed(() => chapterFromQuery(route.query.kapittel))
 
+/** listening mode: hear the Norwegian sentence instead of reading the English (?lytt=1) */
+const listenMode = ref(route.query.lytt === '1')
+
 const levelFilter = ref<Level | 'alle'>('alle')
 const levels: (Level | 'alle')[] = ['alle', 'A1', 'A2', 'B1', 'B2']
 
@@ -43,6 +46,11 @@ function loadExercise() {
   built.value = []
   status.value = 'building'
   showHint.value = false
+  if (listenMode.value) playSentence()
+}
+
+function playSentence(rate = 0.9) {
+  if (current.value && speechAvailable()) speakNorwegian(current.value.no, rate)
 }
 
 function start() {
@@ -146,6 +154,10 @@ function next() {
         </div>
         </template>
         <hr class="dotted-rule my-5" />
+        <label v-if="speechAvailable()" class="mb-4 flex cursor-pointer items-center gap-3">
+          <input v-model="listenMode" type="checkbox" class="h-4 w-4 accent-fjord" />
+          <span class="text-sm font-medium text-ink">🎧 Lyttemodus: hør setningen på norsk i stedet for å lese den på engelsk</span>
+        </label>
         <button class="btn btn-accent w-full" @click="start">
           {{ chapter ? 'Start kapittelets setninger' : 'Start 10 setninger' }}
         </button>
@@ -160,8 +172,18 @@ function next() {
       </div>
 
       <div class="card mt-4 p-6">
-        <p class="kicker">Oversett og bygg setningen</p>
-        <p class="display mt-1 text-xl font-bold text-ink">“{{ current.en }}”</p>
+        <template v-if="listenMode">
+          <p class="kicker">Hør og bygg setningen</p>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <button class="btn btn-primary" @click="playSentence()">🔊 Hør igjen</button>
+            <button class="btn btn-ghost" @click="playSentence(0.6)">🐢 Sakte</button>
+          </div>
+          <p v-if="status === 'correct'" class="mt-3 text-sm italic text-ink-faint">“{{ current.en }}”</p>
+        </template>
+        <template v-else>
+          <p class="kicker">Oversett og bygg setningen</p>
+          <p class="display mt-1 text-xl font-bold text-ink">“{{ current.en }}”</p>
+        </template>
 
         <!-- built sentence -->
         <div
