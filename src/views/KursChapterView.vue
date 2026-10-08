@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import { chapterById, chapterWords, chaptersOf, courses, kurs, ntnuLinks } from '../data/kurs'
 import { listeningFor } from '../data/kurs/listening'
 import { useProgressStore } from '../stores/progress'
-import { TEST_PASS, useJourney, type JourneyItem, type StepKey } from '../lib/journey'
+import { TEST_PASS, overrideKey, useJourney, type JourneyItem, type JourneyStep, type StepKey } from '../lib/journey'
 import { speakNorwegian, speechAvailable } from '../lib/speech'
 import { dialogueAudioUrls, speakCard } from '../lib/audio'
 import AudioPlayer from '../components/AudioPlayer.vue'
@@ -83,6 +83,35 @@ watch(
 
 function listened(i: number, score: number) {
   if (chapter.value) progress.recordStep(chapter.value.id, `lytt-${i}`, score)
+}
+
+/** a text played to the end: remember it, and open its questions straight away */
+const openSignals = reactive<Record<number, number>>({})
+function heard(i: number) {
+  if (!chapter.value) return
+  progress.recordStep(chapter.value.id, `hort-${i}`, 1)
+  if (!item(`lytt-${i}`)?.done) openSignals[i] = (openSignals[i] ?? 0) + 1
+}
+
+/** hand-mark an automatic item finished (or undo that) */
+function toggleOverride(it: JourneyItem) {
+  if (!chapter.value) return
+  const k = overrideKey(it.key)
+  if (progress.stepValue(chapter.value.id, k) === 1) progress.clearStep(chapter.value.id, k)
+  else progress.recordStep(chapter.value.id, k, 1)
+}
+const isOverridden = (it: JourneyItem) => !!chapter.value && progress.stepValue(chapter.value.id, overrideKey(it.key)) === 1
+
+/** mark every required item of a step finished in one go */
+function finishStep(st: JourneyStep) {
+  if (!chapter.value) return
+  for (const it of st.items) {
+    if (!it.required || it.done) continue
+    progress.recordStep(chapter.value.id, it.manual ? it.key : overrideKey(it.key), 1)
+  }
+  open[st.key] = false
+  const n = next.value
+  if (n) open[n.step.key] = true
 }
 
 function toggleManual(key: string) {
@@ -192,16 +221,23 @@ function toggleManual(key: string) {
               Lyden er NTNUs egne opptak fra {{ course.source.name }}.
             </p>
             <div v-for="(title, i) in chapter.dialogues" :id="`item-lytt-${i}`" :key="i" class="mt-4 scroll-mt-56">
-              <p class="mb-1 text-xs font-bold" :class="item(`lytt-${i}`)?.done ? 'text-moss' : 'text-ink-faint'">
-                {{ item(`lytt-${i}`)?.done ? '✓ Ferdig' : '○ Ikke ferdig' }}
-              </p>
-              <AudioPlayer :src="audioUrls[i]" :label="title" :letter="course.dialogueLetters[i]" />
+              <div class="mb-1 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span class="font-bold" :class="item(`lytt-${i}`)?.done ? 'text-moss' : 'text-ink-faint'">
+                  {{ item(`lytt-${i}`)?.done ? '✓ Ferdig' : '○ Ikke ferdig' }} · {{ item(`lytt-${i}`)?.detail }}
+                  <span v-if="!item(`lytt-${i}`)?.done && progress.stepValue(chapter.id, `hort-${i}`) === 1" class="text-gull"> — svar på spørsmålene for å fullføre</span>
+                </span>
+                <button class="font-bold text-ink-faint hover:text-fjord" @click="toggleOverride(item(`lytt-${i}`)!)">
+                  {{ isOverridden(item(`lytt-${i}`)!) ? 'Angre «ferdig»' : item(`lytt-${i}`)?.done ? '' : 'Merk som ferdig' }}
+                </button>
+              </div>
+              <AudioPlayer :src="audioUrls[i]" :label="title" :letter="course.dialogueLetters[i]" @heard="heard(i)" />
               <div class="ml-1 flex flex-wrap items-start justify-between gap-x-4">
                 <ListeningCheck
                   v-if="questions[i]?.length"
                   :questions="questions[i]"
                   :best="progress.stepValue(chapter.id, `lytt-${i}`)"
                   :show-english="chapter.course === 'nybegynner' && chapter.n <= 6"
+                  :open-signal="openSignals[i]"
                   @done="(sc) => listened(i, sc)"
                 />
                 <a :href="links.dialogues[i]" target="_blank" rel="noopener" class="mt-1 text-xs text-ink-faint no-underline hover:text-fjord">Les teksten hos NTNU ↗</a>
@@ -280,7 +316,14 @@ function toggleManual(key: string) {
                   + {{ words.length - shownWords.length }} til
                 </button>
               </div>
-              <RouterLink :to="{ path: '/ord', query: { kapittel: chapter.id } }" class="btn btn-primary mt-4 inline-flex">Lær kapittelets ord →</RouterLink>
+              <div class="mt-4 flex flex-wrap items-center gap-3">
+                <RouterLink :to="{ path: '/ord', query: { kapittel: chapter.id } }" class="btn btn-primary">Lær kapittelets ord →</RouterLink>
+                <button
+                  v-if="isOverridden(item('ord')!) || !item('ord')?.done"
+                  class="text-xs font-bold text-ink-faint hover:text-fjord"
+                  @click="toggleOverride(item('ord')!)"
+                >{{ isOverridden(item('ord')!) ? 'Angre «ferdig»' : 'Jeg kan disse ordene — merk som ferdig' }}</button>
+              </div>
             </div>
           </template>
 
@@ -305,9 +348,16 @@ function toggleManual(key: string) {
                   <span v-if="!it.required" class="ml-1 text-xs text-ink-faint">(valgfritt)</span>
                   <span v-if="it.detail" class="block text-xs text-ink-faint">{{ it.detail }}</span>
                 </span>
-                <RouterLink v-if="it.to" :to="it.to" class="btn !py-1 text-sm" :class="it.done ? 'btn-ghost' : 'btn-accent'">
-                  {{ it.done ? 'Øv igjen' : 'Start' }} →
-                </RouterLink>
+                <span class="flex items-center gap-3">
+                  <button
+                    v-if="it.markable && (isOverridden(it) || !it.done)"
+                    class="text-xs font-bold text-ink-faint hover:text-fjord"
+                    @click="toggleOverride(it)"
+                  >{{ isOverridden(it) ? 'Angre «ferdig»' : 'Merk som ferdig' }}</button>
+                  <RouterLink v-if="it.to" :to="it.to" class="btn !py-1 text-sm" :class="it.done ? 'btn-ghost' : 'btn-accent'">
+                    {{ it.done ? 'Øv igjen' : 'Start' }} →
+                  </RouterLink>
+                </span>
               </li>
             </ul>
           </template>
@@ -331,6 +381,10 @@ function toggleManual(key: string) {
               </div>
             </div>
           </template>
+
+          <div v-if="s.key !== 'prove' && !s.done" class="mt-5 flex justify-end border-t border-rule pt-4">
+            <button class="btn btn-ghost !py-1 text-sm" @click="finishStep(s)">✓ Merk hele steget som ferdig</button>
+          </div>
         </div>
       </section>
 

@@ -34,7 +34,12 @@ export interface JourneyItem {
   to?: RouteLocationRaw
   /** ticked by hand on the chapter page */
   manual?: boolean
+  /** can be marked finished by hand even though it normally ticks itself */
+  markable?: boolean
 }
+
+/** progress key for marking an automatic item finished by hand */
+export const overrideKey = (key: string) => `ok-${key}`
 
 export interface JourneyStep {
   key: StepKey
@@ -50,20 +55,25 @@ export function useJourney() {
 
   function stepsFor(c: KursChapter): JourneyStep[] {
     const v = (k: string) => progress.stepValue(c.id, k)
+    const marked = (k: string) => v(overrideKey(k)) === 1
+    /** automatic items can also be marked finished by hand */
+    const auto = (i: JourneyItem): JourneyItem => ({ ...i, done: i.done || marked(i.key), markable: true })
     const letters = courses[c.course].dialogueLetters
     const q = { kapittel: c.id }
 
     const listening = listeningFor(c)
     const lytt: JourneyItem[] = c.dialogues.map((title, i) => {
       const best = v(`lytt-${i}`)
-      return {
+      const n = listening[i]?.length ?? 0
+      const heard = v(`hort-${i}`) === 1
+      return auto({
         key: `lytt-${i}`,
         label: `${letters[i]} · ${title}`,
-        done: listening[i]?.length ? (best ?? 0) >= LISTEN_PASS : true,
-        required: !!listening[i]?.length,
-        detail: best !== undefined ? `${Math.round(best * (listening[i]?.length ?? 0))}/${listening[i]?.length} riktige` : 'Ikke besvart',
+        done: n ? (best ?? 0) >= LISTEN_PASS : heard,
+        required: true,
+        detail: `${heard ? '🎧 Hørt ✓' : '🎧 Ikke hørt'} · ❓ ${best !== undefined ? `${Math.round(best * n)}/${n} riktige` : `0/${n}`}`,
         anchor: `item-lytt-${i}`,
-      }
+      })
     })
 
     const gram: JourneyItem[] = [
@@ -82,7 +92,7 @@ export function useJourney() {
     const words = chapterWords(c)
     const seen = words.filter((w) => progress.state.srs[w.id]).length
     const ord: JourneyItem[] = [
-      {
+      auto({
         key: 'ord',
         label: 'Lær kapittelets ord',
         done: !words.length || seen / words.length >= WORDS_PASS,
@@ -90,18 +100,18 @@ export function useJourney() {
         detail: `${seen} av ${words.length} ord gjennomgått`,
         anchor: 'item-ord',
         to: { path: '/ord', query: q },
-      },
+      }),
     ]
 
     const pct = (k: string) => (v(k) !== undefined ? `Beste: ${Math.round(v(k)! * 100)} %` : 'Ikke tatt')
-    const ov: JourneyItem[] = [
+    const ov: JourneyItem[] = ([
       { key: 'bygg', label: 'Bygg setninger', done: v('bygg') !== undefined, required: true, detail: pct('bygg'), anchor: 'item-bygg', to: { path: '/setninger', query: q } },
       { key: 'sjekk', label: 'Grammatikkquiz (minst 70 %)', done: (v('sjekk') ?? 0) >= QUIZ_PASS, required: true, detail: pct('sjekk'), anchor: 'item-sjekk', to: { path: '/quiz', query: q } },
       { key: 'bygg-lytt', label: 'Hør og bygg', done: v('bygg-lytt') !== undefined, required: false, detail: pct('bygg-lytt'), anchor: 'item-bygg-lytt', to: { path: '/setninger', query: { ...q, lytt: '1' } } },
       { key: 'diktat', label: 'Diktat', done: v('diktat') !== undefined, required: false, detail: pct('diktat'), anchor: 'item-diktat', to: { path: '/lytt', query: { ...q, modus: 'diktat' } } },
-    ]
+    ] as JourneyItem[]).map(auto)
 
-    const snakk: JourneyItem[] = [
+    const snakk: JourneyItem[] = ([
       {
         key: 'snakk-fritt',
         label: 'Snakk fritt',
@@ -112,7 +122,7 @@ export function useJourney() {
       },
       { key: 'snakk-si', label: 'Si det på norsk', done: v('snakk-si') !== undefined, required: false, detail: pct('snakk-si'), anchor: 'item-snakk-si', to: { path: '/lytt', query: { ...q, modus: 'si' } } },
       { key: 'snakk-gjenta', label: 'Hør og gjenta', done: v('snakk-gjenta') !== undefined, required: false, detail: pct('snakk-gjenta'), anchor: 'item-snakk-gjenta', to: { path: '/lytt', query: { ...q, modus: 'gjenta' } } },
-    ]
+    ] as JourneyItem[]).map(auto)
 
     const prove: JourneyItem[] = [
       {

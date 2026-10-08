@@ -3,6 +3,14 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 import { stopAudio } from '../lib/audio'
 
 const props = defineProps<{ src: string; label: string; letter?: string }>()
+/** heard = played to the end (or past 90 %) — fired once per play-through */
+const emit = defineEmits<{ heard: [] }>()
+let heardFired = false
+function markHeard() {
+  if (heardFired) return
+  heardFired = true
+  emit('heard')
+}
 
 const audio = ref<HTMLAudioElement | null>(null)
 const playing = ref(false)
@@ -22,9 +30,16 @@ function ensure(): HTMLAudioElement {
   if (!audio.value) {
     const a = new Audio(props.src)
     a.preload = 'metadata'
-    a.addEventListener('timeupdate', () => (current.value = a.currentTime))
+    a.addEventListener('timeupdate', () => {
+      current.value = a.currentTime
+      if (a.duration && a.currentTime / a.duration >= 0.9) markHeard()
+    })
     a.addEventListener('loadedmetadata', () => (duration.value = a.duration))
-    a.addEventListener('ended', () => (playing.value = false))
+    a.addEventListener('ended', () => {
+      playing.value = false
+      markHeard()
+      heardFired = false
+    })
     a.addEventListener('pause', () => (playing.value = false))
     a.addEventListener('play', () => (playing.value = true))
     a.addEventListener('error', () => (failed.value = true))

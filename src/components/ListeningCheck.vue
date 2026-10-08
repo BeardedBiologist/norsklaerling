@@ -1,9 +1,15 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { ListeningQuestion } from '../types'
 import { permutation } from '../lib/utils'
 
-const props = defineProps<{ questions: ListeningQuestion[]; best?: number; showEnglish?: boolean }>()
+const props = defineProps<{
+  questions: ListeningQuestion[]
+  best?: number
+  showEnglish?: boolean
+  /** bump to open the questions from outside (e.g. when the audio ends) */
+  openSignal?: number
+}>()
 const emit = defineEmits<{ done: [score: number] }>()
 
 const open = ref(false)
@@ -22,6 +28,13 @@ function start() {
   checked.value = false
   open.value = true
 }
+
+watch(
+  () => props.openSignal,
+  (n) => {
+    if (n && !open.value) start()
+  },
+)
 
 const allPicked = computed(() => picks.value.every((p) => p !== null))
 const score = computed(() => picks.value.filter((p, i) => p === shuffled.value[i]?.correctIndex).length)
