@@ -2,27 +2,30 @@ import type { ListeningQuestion } from '../../types'
 
 /**
  * Comprehension questions for NTNU LearnNoW's texts, keyed by chapter id;
- * one array per text, in A–D order. The questions are our own — the texts
+ * one array per text, in A–D order. Every question must be answerable from
+ * what the RECORDING says — NTNU's pages sometimes add context that is not
+ * spoken (chapter 1 especially), and that must never be asked about. The questions are our own — the texts
  * themselves are NTNU's and are only played/linked, never reproduced.
  * The correct option is always index 0 (options are shuffled at runtime).
  */
 export const listeningNybegynner: Record<string, ListeningQuestion[][]> = {
+  // Chapter 1's recordings are one greeting each — ask only about what is said.
   '1': [
     [
-      { q: 'Hvor gammel er Alex?', en: 'How old is Alex?', options: ['Fem år', 'Fjorten år', 'Tre år', 'Ti år'], answer: 0 },
-      { q: 'Hvor reiser Alex?', en: 'Where is Alex travelling?', options: ['Fra Paris til Oslo', 'Fra Oslo til Paris', 'Fra Bergen til Oslo', 'Fra London til Oslo'], answer: 0 },
+      { q: 'Hva heter han?', en: 'What is his name?', options: ['Alex', 'Ben', 'Dina', 'Hans'], answer: 0 },
+      { q: 'Hva spør han deg om?', en: 'What does he ask you?', options: ['Hva du heter', 'Hvor du kommer fra', 'Hvor gammel du er', 'Hvor du bor'], answer: 0 },
     ],
     [
-      { q: 'Hvor kommer Benjamin fra?', en: 'Where is Benjamin from?', options: ['Frankrike', 'Norge', 'Spania', 'Sverige'], answer: 0 },
-      { q: 'Hvor mange barn har Benjamin?', en: 'How many children does Benjamin have?', options: ['To', 'Ett', 'Tre', 'Fire'], answer: 0 },
+      { q: 'Hva heter han?', en: 'What is his name?', options: ['Benjamin Vidal', 'Alex Vidal', 'Benjamin Hansen', 'Hans Olsen'], answer: 0 },
+      { q: 'Hva sier han til slutt?', en: 'What does he say at the end?', options: ['Hyggelig å hilse på deg!', 'Hva heter du?', 'Ha det bra!', 'Hvor kommer du fra?'], answer: 0 },
     ],
     [
-      { q: 'Hva er Cecilie?', en: 'What nationality is Cecilie?', options: ['Norsk', 'Fransk', 'Svensk', 'Engelsk'], answer: 0 },
-      { q: 'Hvor skal familien bo?', en: 'Where is the family going to live?', options: ['I Fjordvik', 'I Paris', 'I Oslo', 'I Bergen'], answer: 0 },
+      { q: 'Hva sier Cecilie om seg selv?', en: 'What does Cecilie say about herself?', options: ['At hun er norsk', 'At hun er fransk', 'At hun bor i Paris', 'At hun er lege'], answer: 0 },
+      { q: 'Hva spør hun deg om?', en: 'What does she ask you?', options: ['Om du er norsk', 'Hva du heter', 'Hvor du bor', 'Om du snakker fransk'], answer: 0 },
     ],
     [
-      { q: 'Hvor gammel er Dina?', en: 'How old is Dina?', options: ['Fjorten år', 'Fem år', 'Atten år', 'Tolv år'], answer: 0 },
-      { q: 'Hvor kommer Dina fra?', en: 'Where does Dina come from?', options: ['Frankrike', 'Norge', 'Tyskland', 'Polen'], answer: 0 },
+      { q: 'Hvor kommer Dina fra?', en: 'Where does Dina come from?', options: ['Frankrike', 'Norge', 'Sverige', 'England'], answer: 0 },
+      { q: 'Hva spør hun deg om?', en: 'What does she ask you?', options: ['Hvor du kommer fra', 'Hva du heter', 'Om du er norsk', 'Hvor gammel du er'], answer: 0 },
     ],
   ],
   '2': [

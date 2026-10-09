@@ -3,7 +3,8 @@ import type { ListeningQuestion } from '../../types'
 /**
  * Comprehension questions for NTNU NoW2's texts (A, B, X per chapter),
  * keyed by chapter id. Our own questions — the texts are NTNU's and are
- * only played/linked. The correct option is always index 0.
+ * only played/linked. Questions must be answerable from what the recording
+ * says (checked against recording length vs. text length for every text). The correct option is always index 0.
  */
 export const listeningB1: Record<string, ListeningQuestion[][]> = {
   'b1-1': [
