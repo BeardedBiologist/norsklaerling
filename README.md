@@ -15,7 +15,7 @@ and the [statsborgerprøven](https://prove.hkdir.no/en/norwegian-citizenship-tes
 | `/ord` | Ordforråd | 2000+ flashcards (A2–B2) with SM-2 spaced repetition, example sentences and Norwegian text-to-speech |
 | `/setninger` | Setningsbygging | 120 word-tile sentence drills for V2 inversion, `ikke` placement, subordinate clauses |
 | `/quiz` | Grammatikkquiz | 40 norskprøve-style multiple-choice grammar questions with explanations |
-| `/lytt` | Lytt og snakk | Dictation, hear-and-repeat, say-it-in-Norwegian (graded word by word via the browser's speech recognition) and free speaking with recording + transcript. Chapter dialogues and ~1,700 word pronunciations stream NTNU's own recordings from hf.ntnu.no (`src/lib/audio.ts`, `word-audio.json`) |
+| `/lytt` | Lytt og snakk | Dictation, hear-and-repeat, say-it-in-Norwegian (graded word by word via the browser's speech recognition) and free speaking with recording + transcript. Optional AI feedback (`src/lib/ai.ts`): the recording + transcript go to Gemini through Firebase AI Logic (free Gemini Developer API tier, no server) for a corrected version, explained errors, oral-test-style scores, an estimated level and pronunciation notes. Enable once in Firebase console → AI Logic → Get started → Gemini Developer API. Chapter dialogues and ~1,700 word pronunciations stream NTNU's own recordings from hf.ntnu.no (`src/lib/audio.ts`, `word-audio.json`) |
 | `/statsborger` | Statsborgerprøven | Practice mode with English aid + full exam simulation (36 questions, 60-minute timer, pass at 24) |
 
 Progress (SRS schedule, streak, quiz history, exam attempts) persists in
