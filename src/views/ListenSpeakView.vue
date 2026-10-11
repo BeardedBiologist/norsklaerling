@@ -9,7 +9,7 @@ import { speakNorwegian, speechAvailable } from '../lib/speech'
 import { stopAudio } from '../lib/audio'
 import { listen, recognitionAvailable, type Listening } from '../lib/recognition'
 import { compareSentence, normalizeWords, type Comparison } from '../lib/compare'
-import { aiAvailable, analyseFreeSpeech, analyseSentence, type FreeFeedback, type SentenceFeedback } from '../lib/ai'
+import { aiAvailable, analyseFreeSpeech, analyseSentence, type FreeFeedback, type SentenceFeedback, type SentenceTask } from '../lib/ai'
 import type { Level, SentenceExercise } from '../types'
 
 type Mode = 'diktat' | 'gjenta' | 'si' | 'fritt'
@@ -35,6 +35,22 @@ const levelFilter = ref<Level | 'alle'>('alle')
 const levels: (Level | 'alle')[] = ['alle', 'A1', 'A2', 'B1', 'B2']
 
 const micOk = recognitionAvailable()
+
+/** run AI feedback automatically after every answer (remembered in this browser) */
+const AUTO_KEY = 'norsklaerling-ai-auto'
+const autoAi = ref(true)
+try {
+  autoAi.value = localStorage.getItem(AUTO_KEY) !== '0'
+} catch {
+  // storage unavailable — keep the default
+}
+watch(autoAi, (on) => {
+  try {
+    localStorage.setItem(AUTO_KEY, on ? '1' : '0')
+  } catch {
+    // ignore
+  }
+})
 const ttsOk = speechAvailable()
 
 // ── session ──
@@ -92,6 +108,7 @@ function resetItem() {
   result.value = null
   revealed.value = false
   counted.value = false
+  aiCredited.value = false
   error.value = ''
   clearRecording()
   if (mode.value === 'diktat' || mode.value === 'gjenta') setTimeout(() => play(), 250)
@@ -120,10 +137,12 @@ function grade(answer: string) {
 
 function checkTyped() {
   grade(typed.value)
+  if (autoAi.value && aiOk && (result.value?.score ?? 0) < 1) void askAi()
 }
 
 // ── microphone: speech recognition + a recording to listen back to ──
 const recordingUrl = ref<string | null>(null)
+let pendingAi = false
 /** the last recording, kept for AI feedback */
 let recordingBlob: Blob | null = null
 const hasRecording = ref(false)
@@ -141,6 +160,7 @@ function clearRecording() {
   freeFb.value = null
   sentFb.value = null
   aiError.value = ''
+  pendingAi = false
 }
 
 async function startRecorder() {
@@ -153,6 +173,10 @@ async function startRecorder() {
       recordingBlob = new Blob(chunks, { type: recorder?.mimeType || 'audio/webm' })
       recordingUrl.value = URL.createObjectURL(recordingBlob)
       hasRecording.value = true
+      if (pendingAi) {
+        pendingAi = false
+        void askAi()
+      }
       stream?.getTracks().forEach((t) => t.stop())
       stream = null
     }
@@ -175,8 +199,13 @@ function startSpeaking() {
     onDone: (t) => {
       listening.value = false
       transcript.value = t
-      stopRecorder()
       if (!free && t) grade(t)
+      // AI feedback waits for the recording; without a recorder it goes on the transcript alone
+      if (autoAi.value && aiOk && t) {
+        if (recorder && recorder.state !== 'inactive') pendingAi = true
+        else void askAi()
+      }
+      stopRecorder()
     },
     onError: (m) => (error.value = m),
   })
@@ -238,6 +267,8 @@ const aiLoading = ref(false)
 const aiError = ref('')
 const freeFb = ref<FreeFeedback | null>(null)
 const sentFb = ref<SentenceFeedback | null>(null)
+/** the AI accepted an answer the word match rejected — counted once per sentence */
+const aiCredited = ref(false)
 
 async function askAi() {
   aiLoading.value = true
@@ -251,7 +282,20 @@ async function askAi() {
         level: chapter.value?.level ?? (levelFilter.value === 'alle' ? 'B1' : levelFilter.value),
       })
     } else if (current.value) {
-      sentFb.value = await analyseSentence({ target: current.value.no, transcript: transcript.value, audio: recordingBlob })
+      const task = mode.value as SentenceTask
+      sentFb.value = await analyseSentence({
+        task,
+        target: current.value.no,
+        english: current.value.en,
+        answer: task === 'diktat' ? typed.value : transcript.value,
+        audio: recordingBlob,
+      })
+      // a different but correct way of saying it still counts
+      if (sentFb.value.correct && (result.value?.score ?? 0) < PASS && !aiCredited.value) {
+        aiCredited.value = true
+        score.value++
+        revealed.value = true
+      }
     }
   } catch (e) {
     aiError.value = e instanceof Error ? e.message : String(e)
@@ -353,6 +397,13 @@ const freeStats = computed(() => {
           </div>
         </template>
 
+        <label v-if="aiOk" class="mt-5 flex cursor-pointer items-center gap-3">
+          <input v-model="autoAi" type="checkbox" class="h-4 w-4 accent-fjord" />
+          <span class="text-sm font-medium text-ink">
+            🤖 AI-tilbakemelding automatisk etter hvert svar
+            <span class="block text-xs text-ink-faint">Grammatikk, uttale og forklaringer. Slå av for å spare gratiskvoten — du kan fortsatt be om det med en knapp.</span>
+          </span>
+        </label>
         <button class="btn btn-accent mt-5 w-full" :disabled="modeInfo.needsMic && !micOk" @click="start">
           Start {{ modeInfo.title.toLowerCase() }}
         </button>
@@ -415,9 +466,8 @@ const freeStats = computed(() => {
             </ul>
           </div>
           <div v-if="aiOk" class="mt-4">
-            <button v-if="!freeFb" class="btn btn-primary" :disabled="aiLoading || listening" @click="askAi">
-              {{ aiLoading ? 'Analyserer …' : '🤖 Få tilbakemelding fra AI' }}
-            </button>
+            <p v-if="aiLoading" class="text-sm font-bold text-fjord">🤖 AI-en lytter til svaret ditt …</p>
+            <button v-else-if="!freeFb" class="btn btn-primary" :disabled="listening" @click="askAi">🤖 Få tilbakemelding fra AI</button>
             <p v-if="aiError" class="mt-2 text-sm font-bold text-rod">{{ aiError }}</p>
           </div>
 
@@ -560,27 +610,51 @@ const freeStats = computed(() => {
           </p>
         </div>
 
-        <div v-if="aiOk && mode !== 'diktat' && transcript && !listening && hasRecording" class="mt-4">
-            <button v-if="!sentFb" class="btn btn-primary" :disabled="aiLoading || listening" @click="askAi">
-              {{ aiLoading ? 'Analyserer …' : '🤖 Sjekk uttalen med AI' }}
-            </button>
-            <p v-if="aiError" class="mt-2 text-sm font-bold text-rod">{{ aiError }}</p>
-          </div>
+        <!-- AI feedback (all sentence modes) -->
+        <div v-if="aiOk && !listening && (mode === 'diktat' ? !!result : !!transcript)" class="mt-4">
+          <p v-if="aiLoading" class="text-sm font-bold text-fjord">🤖 AI-en ser på svaret ditt …</p>
+          <button v-else-if="!sentFb" class="btn btn-primary !py-1 text-sm" @click="askAi">
+            🤖 {{ mode === 'diktat' ? 'Forklar feilene med AI' : 'Få tilbakemelding fra AI' }}
+          </button>
+          <p v-if="aiError" class="mt-2 text-sm font-bold text-rod">{{ aiError }}</p>
+        </div>
 
-        <div v-if="sentFb" class="pop mt-4 rounded-xl border-2 border-fjord bg-fjord-wash p-4 text-sm">
+        <div v-if="sentFb" class="pop mt-4 space-y-3 rounded-xl border-2 border-fjord bg-fjord-wash p-4 text-sm">
           <div class="flex flex-wrap items-baseline justify-between gap-2">
-            <p class="font-bold" :class="sentFb.correct ? 'text-moss' : 'text-gull'">{{ sentFb.correct ? 'Du sa setningen ✓' : 'Ikke helt den setningen' }}</p>
+            <p class="font-bold" :class="sentFb.correct ? 'text-moss' : 'text-gull'">
+              <template v-if="aiCredited">AI-en godtar svaret ditt ✓ — det teller som riktig</template>
+              <template v-else-if="sentFb.correct">{{ mode === 'diktat' ? 'Riktig skrevet ✓' : 'Riktig ✓' }}</template>
+              <template v-else>{{ mode === 'si' ? 'Ikke helt riktig ennå' : mode === 'diktat' ? 'Noen feil i det du skrev' : 'Ikke helt den setningen' }}</template>
+            </p>
             <span v-if="sentFb.pronunciationScore > 0" class="chip bg-card text-fjord">Uttale: {{ sentFb.pronunciationScore }}/5</span>
           </div>
-          <ul v-if="sentFb.notes.length" class="mt-2 space-y-1">
+
+          <div v-if="!sentFb.correct || aiCredited || mode === 'si'">
+            <p class="kicker">{{ mode === 'si' ? 'Din setning, rettet' : 'Riktig' }}</p>
+            <p class="mt-1 rounded-lg bg-card p-2 font-bold text-ink">
+              {{ sentFb.corrected }}
+              <button v-if="ttsOk" class="ml-1 text-xs font-normal" title="Hør" @click="speakNorwegian(sentFb.corrected, 0.9)">🔊</button>
+            </p>
+          </div>
+
+          <ul v-if="sentFb.errors.length" class="space-y-2">
+            <li v-for="(e, i) in sentFb.errors" :key="i" class="rounded-lg bg-card p-2">
+              <span class="chip mr-1 bg-gull-wash text-gull">{{ ERROR_LABELS[e.type] ?? e.type }}</span>
+              <span class="text-rod-deep line-through">{{ e.said }}</span> → <strong class="text-moss">{{ e.correct }}</strong>
+              <p class="mt-1 text-ink-soft">{{ e.explanation }}</p>
+            </li>
+          </ul>
+
+          <ul v-if="sentFb.notes.length" class="space-y-1">
             <li v-for="(n, i) in sentFb.notes" :key="i">
-              <strong class="text-ink">{{ n.word }}</strong>
+              🗣 <strong class="text-ink">{{ n.word }}</strong>
               <button v-if="ttsOk" class="ml-1 text-xs" title="Hør ordet" @click="speakNorwegian(n.word, 0.8)">🔊</button>
               — <span class="text-ink-soft">{{ n.issue }}</span>
             </li>
           </ul>
-          <p class="mt-2 text-ink"><strong>Tips:</strong> {{ sentFb.tip }}</p>
-          <p class="mt-1 text-[11px] text-ink-faint">Hørt av AI: «{{ sentFb.heard }}»</p>
+
+          <p class="text-ink"><strong>Tips:</strong> {{ sentFb.tip }}</p>
+          <p class="text-[11px] text-ink-faint">{{ mode === 'diktat' ? 'Du skrev' : 'Hørt av AI' }}: «{{ sentFb.heard }}» · AI-vurderingen er veiledende.</p>
         </div>
         <div v-if="revealed" class="mt-4 rounded-xl bg-paper p-4">
           <p class="kicker">Fasit</p>

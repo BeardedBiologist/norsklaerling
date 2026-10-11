@@ -60,9 +60,11 @@ const freeSchema = Schema.object({
 
 const sentenceSchema = Schema.object({
   properties: {
-    heard: Schema.string({ description: 'what the learner said, transcribed from the audio' }),
-    correct: Schema.boolean({ description: 'true if the learner said the target sentence (small pronunciation slips allowed)' }),
-    pronunciationScore: Schema.integer({ description: '1–5, how Norwegian it sounds' }),
+    heard: Schema.string({ description: 'what the learner said or wrote' }),
+    correct: Schema.boolean({ description: 'true if the answer is acceptable for this exercise (see the task rules)' }),
+    corrected: Schema.string({ description: 'the best correct Norwegian version of what the learner was trying to say' }),
+    errors: Schema.array({ items: errorSchema }),
+    pronunciationScore: Schema.integer({ description: '1–5, how Norwegian it sounds; 0 if there is no recording' }),
     notes: Schema.array({
       items: Schema.object({
         properties: { word: Schema.string(), issue: Schema.string({ description: 'what to fix, in English' }) },
@@ -86,6 +88,8 @@ export interface FreeFeedback {
 export interface SentenceFeedback {
   heard: string
   correct: boolean
+  corrected: string
+  errors: FreeFeedback['errors']
   pronunciationScore: number
   notes: { word: string; issue: string }[]
   tip: string
@@ -145,12 +149,34 @@ Give structured feedback on the learner's spoken answer.`
   return ask<FreeFeedback>(freeSchema, prompt, opts.audio)
 }
 
-export async function analyseSentence(opts: { target: string; transcript: string; audio: Blob | null }): Promise<SentenceFeedback> {
+export type SentenceTask = 'gjenta' | 'si' | 'diktat'
+
+const TASKS: Record<SentenceTask, (o: { target: string; english?: string; answer: string }) => string> = {
+  gjenta: (o) => `Exercise: LISTEN AND REPEAT. The learner heard and repeated this exact Norwegian sentence: «${o.target}»
+Browser transcript of what they said (may be imperfect — trust the audio): «${o.answer}»
+"correct" = they said the target sentence (small slips allowed). Focus on pronunciation: word stress, vowel length, tones,
+the Norwegian r, silent letters. Mention only words that really need work. List grammar errors only if they changed the words.`,
+  si: (o) => `Exercise: SAY IT IN NORWEGIAN. The learner saw this English sentence and said it in Norwegian: «${o.english}»
+Model answer: «${o.target}» — but ANY natural, grammatical Norwegian sentence with the same meaning is fully correct.
+Browser transcript of what they said (may be imperfect — trust the audio): «${o.answer}»
+"correct" = the meaning is right AND the Norwegian is grammatical. Explain each grammar or word-choice error, then comment on pronunciation.
+"corrected" = the learner's own sentence fixed (keep their wording where it was fine).`,
+  diktat: (o) => `Exercise: DICTATION. The learner heard this Norwegian sentence and typed it: «${o.target}»
+What they typed: «${o.answer}»
+"correct" = identical apart from capitalisation and punctuation. For every difference explain briefly WHY it is spelled that way
+(e.g. silent d, double consonant after a short vowel, definite ending, verb ending, compound written as one word).
+"corrected" = the target sentence. There is no recording: pronunciation score 0, no pronunciation notes.`,
+}
+
+export async function analyseSentence(opts: {
+  task: SentenceTask
+  target: string
+  english?: string
+  answer: string
+  audio: Blob | null
+}): Promise<SentenceFeedback> {
   const prompt = `${EXAMINER}
 
-The learner tried to say this exact Norwegian sentence: «${opts.target}»
-Browser transcript (may be imperfect): «${opts.transcript}»
-
-Judge whether they said it, and how their pronunciation was — word stress, vowel length, tones, the Norwegian r, silent letters. Mention only words that really need work.`
-  return ask<SentenceFeedback>(sentenceSchema, prompt, opts.audio)
+${TASKS[opts.task]({ target: opts.target, english: opts.english, answer: opts.answer })}`
+  return ask<SentenceFeedback>(sentenceSchema, prompt, opts.task === 'diktat' ? null : opts.audio)
 }
