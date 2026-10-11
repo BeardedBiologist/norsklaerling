@@ -10,6 +10,7 @@ import type { RouteLocationRaw } from 'vue-router'
 import type { KursChapter } from '../types'
 import { chapterWords, courses, kurs, kursLessonId } from '../data/kurs'
 import { listeningFor } from '../data/kurs/listening'
+import { speakingTarget, speakingTasksFor, taskPassKey } from '../data/kurs/speaking'
 import { useProgressStore } from '../stores/progress'
 
 export type StepKey = 'lytt' | 'grammatikk' | 'ord' | 'ov' | 'snakk' | 'prove'
@@ -111,12 +112,25 @@ export function useJourney() {
       { key: 'diktat', label: 'Diktat', done: v('diktat') !== undefined, required: false, detail: pct('diktat'), anchor: 'item-diktat', to: { path: '/lytt', query: { ...q, modus: 'diktat' } } },
     ] as JourneyItem[]).map(auto)
 
+    const tasks = speakingTasksFor(c)
+    const target = speakingTarget(c)
+    const passedTasks = tasks.filter((t) => v(taskPassKey(t)) === 1)
+    const passedConv = passedTasks.filter((t) => t.type === 'samtale').length
     const snakk: JourneyItem[] = ([
+      {
+        key: 'tale',
+        label: `Snakkeoppgaver med AI (bestå ${target.passes}${target.conversations ? `, minst ${target.conversations} samtale` : ''})`,
+        done: passedTasks.length >= target.passes && passedConv >= target.conversations,
+        required: true,
+        detail: `${passedTasks.length} av ${tasks.length} bestått${target.conversations ? ` · ${passedConv} samtale${passedConv === 1 ? '' : 'r'}` : ''}`,
+        anchor: 'item-tale',
+        to: { path: '/snakk', query: q },
+      },
       {
         key: 'snakk-fritt',
         label: 'Snakk fritt',
         done: v('snakk-fritt') !== undefined || v('snakk') !== undefined,
-        required: true,
+        required: false,
         anchor: 'item-snakk-fritt',
         to: { path: '/lytt', query: { ...q, modus: 'fritt' } },
       },
@@ -149,7 +163,7 @@ export function useJourney() {
       step('grammatikk', '📖', 'Grammatikk', 'Les hver del, si eksemplene høyt og hak av når du har forstått.', gram),
       step('ord', '🗂', 'Ord', 'Gå gjennom minst 80 % av kapittelets ord.', ord),
       step('ov', '🧩', 'Øv', 'Bygg setningene og få minst 70 % på grammatikkquizen.', ov),
-      step('snakk', '🎙', 'Snakk', 'Svar muntlig på kapittelets spørsmål i «Snakk fritt».', snakk),
+      step('snakk', '🎙', 'Snakk', 'Bestå snakkeoppgavene — AI-en lytter og vurderer svarene dine.', snakk),
       step('prove', '🏁', 'Kapittelprøve', `Bestå prøven med minst ${Math.round(TEST_PASS * 100)} % for å låse opp neste kapittel.`, prove),
     ]
   }

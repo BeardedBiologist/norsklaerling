@@ -145,3 +145,33 @@ export interface ListeningQuestion {
   options: string[]
   answer: number
 }
+
+/**
+ * A speaking challenge, graded by AI.
+ * Monologue types: svar (answer in full sentences), fortell (tell what happened), beskriv (describe),
+ * mening (give and justify an opinion), sammenlign (compare), presenter (short presentation).
+ * samtale = a conversation where the AI plays a role over several turns.
+ */
+export type SpeakingTaskType = 'svar' | 'fortell' | 'beskriv' | 'mening' | 'sammenlign' | 'presenter' | 'samtale'
+
+export interface SpeakingTask {
+  id: string
+  type: SpeakingTaskType
+  /** the task in Norwegian — shown and read aloud */
+  prompt: string
+  /** English help, for the early chapters */
+  en?: string
+  /** words or phrases worth using */
+  hints?: string[]
+  /** only for samtale: the AI's role and how the conversation starts */
+  role?: {
+    /** who the AI is, in Norwegian */
+    ai: string
+    /** the AI's first line */
+    opening: string
+    /** what the learner has to achieve */
+    goal: string
+    /** learner turns before the conversation wraps up */
+    turns: number
+  }
+}
