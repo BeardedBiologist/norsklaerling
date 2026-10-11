@@ -34,7 +34,9 @@ const modeInfo = computed(() => MODES.find((m) => m.id === mode.value)!)
 const levelFilter = ref<Level | 'alle'>('alle')
 const levels: (Level | 'alle')[] = ['alle', 'A1', 'A2', 'B1', 'B2']
 
-const micOk = recognitionAvailable()
+const micOk =
+  recognitionAvailable() ||
+  (aiAvailable() && typeof MediaRecorder !== 'undefined' && !!navigator.mediaDevices?.getUserMedia)
 
 /** run AI feedback automatically after every answer (remembered in this browser) */
 const AUTO_KEY = 'norsklaerling-ai-auto'
@@ -140,9 +142,14 @@ function checkTyped() {
   if (autoAi.value && aiOk && (result.value?.score ?? 0) < 1) void askAi()
 }
 
-// ── microphone: speech recognition + a recording to listen back to ──
+// ── microphone: speech recognition + a recording for playback and AI ──
+//
+// Each press of «Snakk» is one attempt with its own id. An attempt ends when
+// both the recogniser and the recorder have stopped; only then does the AI
+// run. Getting the microphone is asynchronous, so a recorder that becomes
+// ready after the learner already pressed stop is shut down at once instead
+// of holding the microphone (which used to break every later attempt).
 const recordingUrl = ref<string | null>(null)
-let pendingAi = false
 /** the last recording, kept for AI feedback */
 let recordingBlob: Blob | null = null
 const hasRecording = ref(false)
@@ -152,6 +159,14 @@ const startedAt = ref(0)
 const elapsed = ref(0)
 let timer: number | undefined
 
+const canRecord = typeof MediaRecorder !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
+let attempt = 0
+let recDone = true
+let recorderDone = true
+let stopRequested = false
+/** live recognition failed but the recording keeps going until «Stopp» */
+const recFailed = ref(false)
+
 function clearRecording() {
   if (recordingUrl.value) URL.revokeObjectURL(recordingUrl.value)
   recordingUrl.value = null
@@ -160,58 +175,117 @@ function clearRecording() {
   freeFb.value = null
   sentFb.value = null
   aiError.value = ''
-  pendingAi = false
 }
 
-async function startRecorder() {
+/** let go of the microphone completely (any attempt) */
+function releaseMic() {
+  if (recorder && recorder.state !== 'inactive') {
+    recorder.onstop = null
+    recorder.stop()
+  }
+  recorder = null
+  stream?.getTracks().forEach((t) => t.stop())
+  stream = null
+}
+
+async function startRecorder(id: number) {
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    const chunks: Blob[] = []
-    recorder = new MediaRecorder(stream)
-    recorder.ondataavailable = (e) => chunks.push(e.data)
-    recorder.onstop = () => {
-      recordingBlob = new Blob(chunks, { type: recorder?.mimeType || 'audio/webm' })
-      recordingUrl.value = URL.createObjectURL(recordingBlob)
-      hasRecording.value = true
-      if (pendingAi) {
-        pendingAi = false
-        void askAi()
-      }
-      stream?.getTracks().forEach((t) => t.stop())
-      stream = null
+    const s = await navigator.mediaDevices.getUserMedia({ audio: true })
+    if (id !== attempt || stopRequested) {
+      // stopped before the microphone was ready
+      s.getTracks().forEach((t) => t.stop())
+      recorderDone = true
+      maybeFinish(id)
+      return
     }
-    recorder.start()
+    stream = s
+    const chunks: Blob[] = []
+    const r = new MediaRecorder(s)
+    recorder = r
+    r.ondataavailable = (e) => {
+      if (e.data.size) chunks.push(e.data)
+    }
+    r.onstop = () => {
+      s.getTracks().forEach((t) => t.stop())
+      if (stream === s) stream = null
+      if (recorder === r) recorder = null
+      if (id !== attempt) return
+      if (chunks.length) {
+        recordingBlob = new Blob(chunks, { type: r.mimeType || 'audio/webm' })
+        recordingUrl.value = URL.createObjectURL(recordingBlob)
+        hasRecording.value = true
+      }
+      recorderDone = true
+      maybeFinish(id)
+    }
+    r.start()
   } catch {
-    // recording is a bonus — recognition still works without it
+    // no recording possible — recognition (if any) still works
+    recorderDone = true
+    maybeFinish(id)
   }
 }
 
+function stopRecorderNow() {
+  stopRequested = true
+  if (recorder && recorder.state !== 'inactive') recorder.stop()
+}
+
+/** both halves are done: end the attempt and ask the AI */
+function maybeFinish(id: number) {
+  if (id !== attempt || !recDone || !recorderDone) return
+  listening.value = false
+  window.clearInterval(timer)
+  if (autoAi.value && aiOk && (transcript.value || hasRecording.value)) void askAi()
+  else if (!transcript.value && !hasRecording.value && !error.value) error.value = 'Jeg fikk ikke med meg noe. Prøv igjen og snakk litt høyere.'
+}
+
 function startSpeaking() {
+  releaseMic()
+  attempt++
+  const id = attempt
   error.value = ''
   transcript.value = ''
   result.value = null
+  recFailed.value = false
+  stopRequested = false
   clearRecording()
   stopAudio()
   const free = mode.value === 'fritt'
+
+  recDone = false
+  recorderDone = !canRecord
   rec = listen({
     continuous: free,
-    onUpdate: (t) => (transcript.value = t),
+    onUpdate: (t) => {
+      if (id === attempt) transcript.value = t
+    },
     onDone: (t) => {
-      listening.value = false
+      if (id !== attempt) return
       transcript.value = t
       if (!free && t) grade(t)
-      // AI feedback waits for the recording; without a recorder it goes on the transcript alone
-      if (autoAi.value && aiOk && t) {
-        if (recorder && recorder.state !== 'inactive') pendingAi = true
-        else void askAi()
-      }
-      stopRecorder()
+      recDone = true
+      rec = null
+      // normally the recording stops with the recogniser; if live text failed, keep recording until «Stopp»
+      if (!recFailed.value) stopRecorderNow()
+      maybeFinish(id)
     },
-    onError: (m) => (error.value = m),
+    onError: (m, code) => {
+      if (id !== attempt) return
+      if (code === 'no-speech' || !canRecord) error.value = m
+      else recFailed.value = true
+    },
   })
-  if (!rec) return
+  if (!rec) {
+    recDone = true
+    if (canRecord) recFailed.value = true
+  }
+  if (!rec && !canRecord) {
+    error.value = 'Nettleseren kan verken ta opp eller gjenkjenne tale.'
+    return
+  }
   listening.value = true
-  void startRecorder()
+  if (canRecord) void startRecorder(id)
   if (free) {
     startedAt.value = Date.now()
     elapsed.value = 0
@@ -220,22 +294,19 @@ function startSpeaking() {
 }
 
 function stopSpeaking() {
-  rec?.stop()
-}
-
-function stopRecorder() {
-  window.clearInterval(timer)
-  if (recorder && recorder.state !== 'inactive') recorder.stop()
-  recorder = null
+  stopRequested = true
+  if (rec) rec.stop()
+  stopRecorderNow()
+  maybeFinish(attempt)
 }
 
 function stopEverything() {
+  attempt++
   rec?.stop()
   rec = null
   listening.value = false
-  stopRecorder()
-  stream?.getTracks().forEach((t) => t.stop())
-  stream = null
+  window.clearInterval(timer)
+  releaseMic()
   stopAudio()
 }
 
@@ -281,6 +352,8 @@ async function askAi() {
         audio: recordingBlob,
         level: chapter.value?.level ?? (levelFilter.value === 'alle' ? 'B1' : levelFilter.value),
       })
+      // live recognition gave nothing — show what the AI heard instead
+      if (!transcript.value && freeFb.value.heard) transcript.value = freeFb.value.heard
     } else if (current.value) {
       const task = mode.value as SentenceTask
       sentFb.value = await analyseSentence({
@@ -290,6 +363,11 @@ async function askAi() {
         answer: task === 'diktat' ? typed.value : transcript.value,
         audio: recordingBlob,
       })
+      // live recognition gave nothing — use what the AI heard for «Du sa» and the word match
+      if (task !== 'diktat' && !transcript.value && sentFb.value.heard) {
+        transcript.value = sentFb.value.heard
+        grade(sentFb.value.heard)
+      }
       // a different but correct way of saying it still counts
       if (sentFb.value.correct && (result.value?.score ?? 0) < PASS && !aiCredited.value) {
         aiCredited.value = true
@@ -432,12 +510,15 @@ const freeStats = computed(() => {
 
         <p v-if="error" class="mt-3 text-sm font-bold text-rod">{{ error }}</p>
 
+        <p v-if="listening && recFailed" class="mt-3 rounded-lg bg-gull-wash p-2 text-sm text-ink">
+          Live-teksten virker ikke i denne nettleseren akkurat nå, men opptaket går. Trykk <strong>■ Ferdig</strong> når du er ferdig, så lytter AI-en til svaret.
+        </p>
         <div v-if="transcript" class="mt-5 rounded-xl bg-paper p-4">
           <p class="kicker">Dette hørte jeg</p>
           <p class="mt-1 leading-relaxed text-ink">{{ transcript }}</p>
         </div>
 
-        <template v-if="!listening && transcript">
+        <template v-if="!listening && (transcript || hasRecording)">
           <audio v-if="recordingUrl" :src="recordingUrl" controls class="mt-4 w-full" />
           <div class="mt-4 grid gap-3 sm:grid-cols-2">
             <div class="rounded-xl border border-rule p-3">
@@ -581,6 +662,9 @@ const freeStats = computed(() => {
             <button v-if="!revealed" class="btn btn-ghost" @click="reveal">Vis svar</button>
             <span v-if="listening" class="text-sm font-bold text-rod">● Lytter …</span>
           </div>
+          <p v-if="listening && recFailed" class="mt-2 rounded-lg bg-gull-wash p-2 text-sm text-ink">
+            Live-teksten virker ikke akkurat nå, men opptaket går. Trykk <strong>■ Stopp</strong> når du er ferdig, så lytter AI-en til deg.
+          </p>
           <p v-if="transcript" class="mt-3 text-sm text-ink-soft">Du sa: <em class="text-ink">«{{ transcript }}»</em></p>
         </template>
 
@@ -611,7 +695,7 @@ const freeStats = computed(() => {
         </div>
 
         <!-- AI feedback (all sentence modes) -->
-        <div v-if="aiOk && !listening && (mode === 'diktat' ? !!result : !!transcript)" class="mt-4">
+        <div v-if="aiOk && !listening && (mode === 'diktat' ? !!result : !!transcript || hasRecording)" class="mt-4">
           <p v-if="aiLoading" class="text-sm font-bold text-fjord">🤖 AI-en ser på svaret ditt …</p>
           <button v-else-if="!sentFb" class="btn btn-primary !py-1 text-sm" @click="askAi">
             🤖 {{ mode === 'diktat' ? 'Forklar feilene med AI' : 'Få tilbakemelding fra AI' }}
