@@ -27,5 +27,6 @@ if (firebaseEnabled) {
   dbInstance = getFirestore(app)
 }
 
+export const firebaseApp = app
 export const auth = authInstance
 export const db = dbInstance

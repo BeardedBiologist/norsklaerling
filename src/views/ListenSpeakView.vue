@@ -9,6 +9,7 @@ import { speakNorwegian, speechAvailable } from '../lib/speech'
 import { stopAudio } from '../lib/audio'
 import { listen, recognitionAvailable, type Listening } from '../lib/recognition'
 import { compareSentence, normalizeWords, type Comparison } from '../lib/compare'
+import { aiAvailable, analyseFreeSpeech, analyseSentence, type FreeFeedback, type SentenceFeedback } from '../lib/ai'
 import type { Level, SentenceExercise } from '../types'
 
 type Mode = 'diktat' | 'gjenta' | 'si' | 'fritt'
@@ -123,6 +124,9 @@ function checkTyped() {
 
 // ── microphone: speech recognition + a recording to listen back to ──
 const recordingUrl = ref<string | null>(null)
+/** the last recording, kept for AI feedback */
+let recordingBlob: Blob | null = null
+const hasRecording = ref(false)
 let recorder: MediaRecorder | null = null
 let stream: MediaStream | null = null
 const startedAt = ref(0)
@@ -132,6 +136,11 @@ let timer: number | undefined
 function clearRecording() {
   if (recordingUrl.value) URL.revokeObjectURL(recordingUrl.value)
   recordingUrl.value = null
+  recordingBlob = null
+  hasRecording.value = false
+  freeFb.value = null
+  sentFb.value = null
+  aiError.value = ''
 }
 
 async function startRecorder() {
@@ -141,7 +150,9 @@ async function startRecorder() {
     recorder = new MediaRecorder(stream)
     recorder.ondataavailable = (e) => chunks.push(e.data)
     recorder.onstop = () => {
-      recordingUrl.value = URL.createObjectURL(new Blob(chunks, { type: recorder?.mimeType || 'audio/webm' }))
+      recordingBlob = new Blob(chunks, { type: recorder?.mimeType || 'audio/webm' })
+      recordingUrl.value = URL.createObjectURL(recordingBlob)
+      hasRecording.value = true
       stream?.getTracks().forEach((t) => t.stop())
       stream = null
     }
@@ -171,8 +182,8 @@ function startSpeaking() {
   })
   if (!rec) return
   listening.value = true
+  void startRecorder()
   if (free) {
-    void startRecorder()
     startedAt.value = Date.now()
     elapsed.value = 0
     timer = window.setInterval(() => (elapsed.value = Math.round((Date.now() - startedAt.value) / 1000)), 500)
@@ -220,6 +231,43 @@ function next() {
     resetItem()
   }
 }
+
+// ── AI feedback (Gemini via Firebase AI Logic, free tier) ──
+const aiOk = aiAvailable()
+const aiLoading = ref(false)
+const aiError = ref('')
+const freeFb = ref<FreeFeedback | null>(null)
+const sentFb = ref<SentenceFeedback | null>(null)
+
+async function askAi() {
+  aiLoading.value = true
+  aiError.value = ''
+  try {
+    if (mode.value === 'fritt' && currentPrompt.value) {
+      freeFb.value = await analyseFreeSpeech({
+        question: currentPrompt.value,
+        transcript: transcript.value,
+        audio: recordingBlob,
+        level: chapter.value?.level ?? (levelFilter.value === 'alle' ? 'B1' : levelFilter.value),
+      })
+    } else if (current.value) {
+      sentFb.value = await analyseSentence({ target: current.value.no, transcript: transcript.value, audio: recordingBlob })
+    }
+  } catch (e) {
+    aiError.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    aiLoading.value = false
+  }
+}
+
+const SCORE_LABELS: Record<keyof FreeFeedback['scores'], string> = {
+  task: 'Svarer på oppgaven',
+  coherence: 'Sammenheng',
+  vocabulary: 'Ordforråd',
+  grammar: 'Grammatikk',
+  fluency: 'Flyt',
+}
+const ERROR_LABELS: Record<string, string> = { ordstilling: 'Ordstilling', bøyning: 'Bøyning', ordvalg: 'Ordvalg', uttale: 'Uttale', annet: 'Annet' }
 
 watch(mode, () => quit())
 onBeforeUnmount(() => {
@@ -366,6 +414,60 @@ const freeStats = computed(() => {
               <li>☐ Begrunnet jeg meningen min med et eksempel?</li>
             </ul>
           </div>
+          <div v-if="aiOk" class="mt-4">
+            <button v-if="!freeFb" class="btn btn-primary" :disabled="aiLoading || listening" @click="askAi">
+              {{ aiLoading ? 'Analyserer …' : '🤖 Få tilbakemelding fra AI' }}
+            </button>
+            <p v-if="aiError" class="mt-2 text-sm font-bold text-rod">{{ aiError }}</p>
+          </div>
+
+          <div v-if="freeFb" class="pop mt-4 space-y-4 rounded-xl border-2 border-fjord bg-fjord-wash p-4">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+              <p class="display text-lg font-black text-ink">Tilbakemelding</p>
+              <span class="chip bg-card text-fjord">Anslått nivå: {{ freeFb.level }}</span>
+            </div>
+            <p class="text-sm font-bold text-moss">{{ freeFb.praise }}</p>
+
+            <div class="grid gap-2 sm:grid-cols-5">
+              <div v-for="(label, k) in SCORE_LABELS" :key="k" class="rounded-lg bg-card p-2 text-center">
+                <p class="text-[11px] font-bold text-ink-faint">{{ label }}</p>
+                <p class="display text-xl font-black" :class="freeFb.scores[k] >= 4 ? 'text-moss' : freeFb.scores[k] >= 3 ? 'text-gull' : 'text-rod'">{{ freeFb.scores[k] }}/5</p>
+              </div>
+            </div>
+
+            <div>
+              <p class="kicker">Riktig og naturlig norsk</p>
+              <p class="mt-1 rounded-lg bg-card p-3 leading-relaxed text-ink">{{ freeFb.corrected }}</p>
+              <button v-if="ttsOk" class="btn btn-ghost mt-2 !py-1 text-sm" @click="speakNorwegian(freeFb.corrected, 0.9)">🔊 Hør den riktige versjonen</button>
+            </div>
+
+            <div v-if="freeFb.errors.length">
+              <p class="kicker">Feil å jobbe med</p>
+              <ul class="mt-1 space-y-2">
+                <li v-for="(e, i) in freeFb.errors" :key="i" class="rounded-lg bg-card p-3 text-sm">
+                  <span class="chip mr-1 bg-gull-wash text-gull">{{ ERROR_LABELS[e.type] ?? e.type }}</span>
+                  <span class="text-rod-deep line-through">{{ e.said }}</span>
+                  → <strong class="text-moss">{{ e.correct }}</strong>
+                  <p class="mt-1 text-ink-soft">{{ e.explanation }}</p>
+                </li>
+              </ul>
+            </div>
+            <p v-else class="text-sm font-bold text-moss">Ingen grammatikkfeil funnet 👏</p>
+
+            <div>
+              <p class="kicker">Uttale: {{ freeFb.pronunciation.score }}/5</p>
+              <ul v-if="freeFb.pronunciation.notes.length" class="mt-1 space-y-1 text-sm">
+                <li v-for="(n, i) in freeFb.pronunciation.notes" :key="i">
+                  <strong class="text-ink">{{ n.word }}</strong>
+                  <button v-if="ttsOk" class="ml-1 text-xs" title="Hør ordet" @click="speakNorwegian(n.word, 0.8)">🔊</button>
+                  — <span class="text-ink-soft">{{ n.issue }}</span>
+                </li>
+              </ul>
+            </div>
+
+            <p class="rounded-lg bg-gull-wash p-3 text-sm text-ink"><strong>Neste gang:</strong> {{ freeFb.tip }}</p>
+            <p class="text-[11px] text-ink-faint">AI-vurderingen er veiledende og kan ta feil. Hørt av AI: «{{ freeFb.heard }}»</p>
+          </div>
         </template>
 
         <hr class="dotted-rule my-5" />
@@ -458,6 +560,28 @@ const freeStats = computed(() => {
           </p>
         </div>
 
+        <div v-if="aiOk && mode !== 'diktat' && transcript && !listening && hasRecording" class="mt-4">
+            <button v-if="!sentFb" class="btn btn-primary" :disabled="aiLoading || listening" @click="askAi">
+              {{ aiLoading ? 'Analyserer …' : '🤖 Sjekk uttalen med AI' }}
+            </button>
+            <p v-if="aiError" class="mt-2 text-sm font-bold text-rod">{{ aiError }}</p>
+          </div>
+
+        <div v-if="sentFb" class="pop mt-4 rounded-xl border-2 border-fjord bg-fjord-wash p-4 text-sm">
+          <div class="flex flex-wrap items-baseline justify-between gap-2">
+            <p class="font-bold" :class="sentFb.correct ? 'text-moss' : 'text-gull'">{{ sentFb.correct ? 'Du sa setningen ✓' : 'Ikke helt den setningen' }}</p>
+            <span class="chip bg-card text-fjord">Uttale: {{ sentFb.pronunciationScore }}/5</span>
+          </div>
+          <ul v-if="sentFb.notes.length" class="mt-2 space-y-1">
+            <li v-for="(n, i) in sentFb.notes" :key="i">
+              <strong class="text-ink">{{ n.word }}</strong>
+              <button v-if="ttsOk" class="ml-1 text-xs" title="Hør ordet" @click="speakNorwegian(n.word, 0.8)">🔊</button>
+              — <span class="text-ink-soft">{{ n.issue }}</span>
+            </li>
+          </ul>
+          <p class="mt-2 text-ink"><strong>Tips:</strong> {{ sentFb.tip }}</p>
+          <p class="mt-1 text-[11px] text-ink-faint">Hørt av AI: «{{ sentFb.heard }}»</p>
+        </div>
         <div v-if="revealed" class="mt-4 rounded-xl bg-paper p-4">
           <p class="kicker">Fasit</p>
           <p class="mt-1 text-lg font-bold text-ink">{{ current.no }}</p>
