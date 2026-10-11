@@ -175,3 +175,20 @@ export interface SpeakingTask {
     turns: number
   }
 }
+
+/**
+ * Test-only material for a chapter's kapittelprøve. Covers the same grammar,
+ * words and texts as the chapter but never appears in practice, so the test
+ * checks understanding rather than memory. Banks are larger than one test
+ * draws, so retakes differ.
+ */
+export interface ChapterTestBank {
+  /** grammar questions (correct answer at index 0) */
+  quiz: QuizQuestion[]
+  /** new sentences for building and dictation */
+  sentences: SentenceExercise[]
+  /** new listening questions, per NTNU text in order */
+  listening: ListeningQuestion[][]
+  /** test-only speaking tasks for the oral part (graded by AI); more from A2 and B1 */
+  oral: SpeakingTask[]
+}
