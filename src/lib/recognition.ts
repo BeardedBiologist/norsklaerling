@@ -44,7 +44,8 @@ export interface ListenOptions {
   /** live transcript while speaking */
   onUpdate?: (text: string) => void
   onDone: (text: string) => void
-  onError?: (message: string) => void
+  /** message for the learner, plus the raw Web Speech error code */
+  onError?: (message: string, code: string) => void
 }
 
 const ERRORS: Record<string, string> = {
@@ -75,9 +76,15 @@ export function listen(opts: ListenOptions): Listening | null {
     opts.onUpdate?.((finalText + interim).trim())
   }
   rec.onerror = (e) => {
-    if (e.error !== 'aborted') opts.onError?.(ERRORS[e.error] ?? `Talegjenkjenning feilet (${e.error}).`)
+    if (e.error !== 'aborted') opts.onError?.(ERRORS[e.error] ?? `Talegjenkjenning feilet (${e.error}).`, e.error)
   }
   rec.onend = () => opts.onDone((finalText + interim).trim())
-  rec.start()
+  try {
+    rec.start()
+  } catch {
+    // e.g. a previous session still holding the recogniser — report it as a failed start
+    opts.onError?.('Talegjenkjenningen kunne ikke starte. Prøv igjen.', 'start-failed')
+    return null
+  }
   return { stop: () => rec.stop() }
 }
