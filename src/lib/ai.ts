@@ -99,8 +99,13 @@ function model(name: string, schema: ReturnType<typeof Schema.object>): Generati
   })
 }
 
+const NO_AUDIO = `
+NO RECORDING IS ATTACHED — you only have the transcript. Do not comment on pronunciation at all:
+set every pronunciation score to 0 and leave pronunciation notes empty.`
+
 async function ask<T>(schema: ReturnType<typeof Schema.object>, prompt: string, audio: Blob | null): Promise<T> {
   if (!firebaseApp) throw new Error('Firebase er ikke konfigurert.')
+  if (!audio) prompt += NO_AUDIO
   const parts: (string | { inlineData: { mimeType: string; data: string } })[] = [prompt]
   if (audio) parts.push({ inlineData: { mimeType: 'audio/wav', data: await blobToWavBase64(audio) } })
   let lastError: unknown

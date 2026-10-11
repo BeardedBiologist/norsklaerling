@@ -454,7 +454,7 @@ const freeStats = computed(() => {
             </div>
             <p v-else class="text-sm font-bold text-moss">Ingen grammatikkfeil funnet 👏</p>
 
-            <div>
+            <div v-if="freeFb.pronunciation.score > 0">
               <p class="kicker">Uttale: {{ freeFb.pronunciation.score }}/5</p>
               <ul v-if="freeFb.pronunciation.notes.length" class="mt-1 space-y-1 text-sm">
                 <li v-for="(n, i) in freeFb.pronunciation.notes" :key="i">
@@ -570,7 +570,7 @@ const freeStats = computed(() => {
         <div v-if="sentFb" class="pop mt-4 rounded-xl border-2 border-fjord bg-fjord-wash p-4 text-sm">
           <div class="flex flex-wrap items-baseline justify-between gap-2">
             <p class="font-bold" :class="sentFb.correct ? 'text-moss' : 'text-gull'">{{ sentFb.correct ? 'Du sa setningen ✓' : 'Ikke helt den setningen' }}</p>
-            <span class="chip bg-card text-fjord">Uttale: {{ sentFb.pronunciationScore }}/5</span>
+            <span v-if="sentFb.pronunciationScore > 0" class="chip bg-card text-fjord">Uttale: {{ sentFb.pronunciationScore }}/5</span>
           </div>
           <ul v-if="sentFb.notes.length" class="mt-2 space-y-1">
             <li v-for="(n, i) in sentFb.notes" :key="i">
