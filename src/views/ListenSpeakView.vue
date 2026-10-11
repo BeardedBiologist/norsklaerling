@@ -7,9 +7,10 @@ import { useProgressStore } from '../stores/progress'
 import { shuffle } from '../lib/utils'
 import { speakNorwegian, speechAvailable } from '../lib/speech'
 import { stopAudio } from '../lib/audio'
-import { listen, recognitionAvailable, type Listening } from '../lib/recognition'
+import { speakingSupported, useSpeechCapture } from '../lib/useSpeechCapture'
 import { compareSentence, normalizeWords, type Comparison } from '../lib/compare'
 import { aiAvailable, analyseFreeSpeech, analyseSentence, type FreeFeedback, type SentenceFeedback, type SentenceTask } from '../lib/ai'
+import FreeFeedbackCard from '../components/FreeFeedbackCard.vue'
 import type { Level, SentenceExercise } from '../types'
 
 type Mode = 'diktat' | 'gjenta' | 'si' | 'fritt'
@@ -34,9 +35,7 @@ const modeInfo = computed(() => MODES.find((m) => m.id === mode.value)!)
 const levelFilter = ref<Level | 'alle'>('alle')
 const levels: (Level | 'alle')[] = ['alle', 'A1', 'A2', 'B1', 'B2']
 
-const micOk =
-  recognitionAvailable() ||
-  (aiAvailable() && typeof MediaRecorder !== 'undefined' && !!navigator.mediaDevices?.getUserMedia)
+const micOk = speakingSupported(aiAvailable())
 
 /** run AI feedback automatically after every answer (remembered in this browser) */
 const AUTO_KEY = 'norsklaerling-ai-auto'
@@ -95,13 +94,11 @@ function quit() {
 
 // ── per-item state ──
 const typed = ref('')
-const transcript = ref('')
 const result = ref<Comparison | null>(null)
 const revealed = ref(false)
 const counted = ref(false)
-const listening = ref(false)
-const error = ref('')
-let rec: Listening | null = null
+const capture = useSpeechCapture()
+const { listening, transcript, error, recFailed, recordingUrl, hasRecording, elapsed } = capture
 
 function resetItem() {
   stopEverything()
@@ -142,171 +139,38 @@ function checkTyped() {
   if (autoAi.value && aiOk && (result.value?.score ?? 0) < 1) void askAi()
 }
 
-// ── microphone: speech recognition + a recording for playback and AI ──
-//
-// Each press of «Snakk» is one attempt with its own id. An attempt ends when
-// both the recogniser and the recorder have stopped; only then does the AI
-// run. Getting the microphone is asynchronous, so a recorder that becomes
-// ready after the learner already pressed stop is shut down at once instead
-// of holding the microphone (which used to break every later attempt).
-const recordingUrl = ref<string | null>(null)
-/** the last recording, kept for AI feedback */
-let recordingBlob: Blob | null = null
-const hasRecording = ref(false)
-let recorder: MediaRecorder | null = null
-let stream: MediaStream | null = null
-const startedAt = ref(0)
-const elapsed = ref(0)
-let timer: number | undefined
-
-const canRecord = typeof MediaRecorder !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
-let attempt = 0
-let recDone = true
-let recorderDone = true
-let stopRequested = false
-/** live recognition failed but the recording keeps going until «Stopp» */
-const recFailed = ref(false)
-
+// ── microphone (shared capture logic: src/lib/useSpeechCapture.ts) ──
 function clearRecording() {
-  if (recordingUrl.value) URL.revokeObjectURL(recordingUrl.value)
-  recordingUrl.value = null
-  recordingBlob = null
-  hasRecording.value = false
+  capture.clear()
   freeFb.value = null
   sentFb.value = null
   aiError.value = ''
 }
 
-/** let go of the microphone completely (any attempt) */
-function releaseMic() {
-  if (recorder && recorder.state !== 'inactive') {
-    recorder.onstop = null
-    recorder.stop()
-  }
-  recorder = null
-  stream?.getTracks().forEach((t) => t.stop())
-  stream = null
-}
-
-async function startRecorder(id: number) {
-  try {
-    const s = await navigator.mediaDevices.getUserMedia({ audio: true })
-    if (id !== attempt || stopRequested) {
-      // stopped before the microphone was ready
-      s.getTracks().forEach((t) => t.stop())
-      recorderDone = true
-      maybeFinish(id)
-      return
-    }
-    stream = s
-    const chunks: Blob[] = []
-    const r = new MediaRecorder(s)
-    recorder = r
-    r.ondataavailable = (e) => {
-      if (e.data.size) chunks.push(e.data)
-    }
-    r.onstop = () => {
-      s.getTracks().forEach((t) => t.stop())
-      if (stream === s) stream = null
-      if (recorder === r) recorder = null
-      if (id !== attempt) return
-      if (chunks.length) {
-        recordingBlob = new Blob(chunks, { type: r.mimeType || 'audio/webm' })
-        recordingUrl.value = URL.createObjectURL(recordingBlob)
-        hasRecording.value = true
-      }
-      recorderDone = true
-      maybeFinish(id)
-    }
-    r.start()
-  } catch {
-    // no recording possible — recognition (if any) still works
-    recorderDone = true
-    maybeFinish(id)
-  }
-}
-
-function stopRecorderNow() {
-  stopRequested = true
-  if (recorder && recorder.state !== 'inactive') recorder.stop()
-}
-
-/** both halves are done: end the attempt and ask the AI */
-function maybeFinish(id: number) {
-  if (id !== attempt || !recDone || !recorderDone) return
-  listening.value = false
-  window.clearInterval(timer)
-  if (autoAi.value && aiOk && (transcript.value || hasRecording.value)) void askAi()
-  else if (!transcript.value && !hasRecording.value && !error.value) error.value = 'Jeg fikk ikke med meg noe. Prøv igjen og snakk litt høyere.'
-}
-
 function startSpeaking() {
-  releaseMic()
-  attempt++
-  const id = attempt
-  error.value = ''
-  transcript.value = ''
+  freeFb.value = null
+  sentFb.value = null
+  aiError.value = ''
   result.value = null
-  recFailed.value = false
-  stopRequested = false
-  clearRecording()
   stopAudio()
   const free = mode.value === 'fritt'
-
-  recDone = false
-  recorderDone = !canRecord
-  rec = listen({
+  capture.start({
     continuous: free,
-    onUpdate: (t) => {
-      if (id === attempt) transcript.value = t
+    onFinal: (t) => {
+      if (!free) grade(t)
     },
-    onDone: (t) => {
-      if (id !== attempt) return
-      transcript.value = t
-      if (!free && t) grade(t)
-      recDone = true
-      rec = null
-      // normally the recording stops with the recogniser; if live text failed, keep recording until «Stopp»
-      if (!recFailed.value) stopRecorderNow()
-      maybeFinish(id)
-    },
-    onError: (m, code) => {
-      if (id !== attempt) return
-      if (code === 'no-speech' || !canRecord) error.value = m
-      else recFailed.value = true
+    onFinish: ({ transcript: t, blob }) => {
+      if (autoAi.value && aiOk && (t || blob)) void askAi()
     },
   })
-  if (!rec) {
-    recDone = true
-    if (canRecord) recFailed.value = true
-  }
-  if (!rec && !canRecord) {
-    error.value = 'Nettleseren kan verken ta opp eller gjenkjenne tale.'
-    return
-  }
-  listening.value = true
-  if (canRecord) void startRecorder(id)
-  if (free) {
-    startedAt.value = Date.now()
-    elapsed.value = 0
-    timer = window.setInterval(() => (elapsed.value = Math.round((Date.now() - startedAt.value) / 1000)), 500)
-  }
 }
 
 function stopSpeaking() {
-  stopRequested = true
-  if (rec) rec.stop()
-  stopRecorderNow()
-  maybeFinish(attempt)
+  capture.stop()
 }
 
 function stopEverything() {
-  attempt++
-  rec?.stop()
-  rec = null
-  listening.value = false
-  window.clearInterval(timer)
-  releaseMic()
+  capture.release()
   stopAudio()
 }
 
@@ -349,7 +213,7 @@ async function askAi() {
       freeFb.value = await analyseFreeSpeech({
         question: currentPrompt.value,
         transcript: transcript.value,
-        audio: recordingBlob,
+        audio: capture.blob(),
         level: chapter.value?.level ?? (levelFilter.value === 'alle' ? 'B1' : levelFilter.value),
       })
       // live recognition gave nothing — show what the AI heard instead
@@ -361,7 +225,7 @@ async function askAi() {
         target: current.value.no,
         english: current.value.en,
         answer: task === 'diktat' ? typed.value : transcript.value,
-        audio: recordingBlob,
+        audio: capture.blob(),
       })
       // live recognition gave nothing — use what the AI heard for «Du sa» and the word match
       if (task !== 'diktat' && !transcript.value && sentFb.value.heard) {
@@ -382,13 +246,6 @@ async function askAi() {
   }
 }
 
-const SCORE_LABELS: Record<keyof FreeFeedback['scores'], string> = {
-  task: 'Svarer på oppgaven',
-  coherence: 'Sammenheng',
-  vocabulary: 'Ordforråd',
-  grammar: 'Grammatikk',
-  fluency: 'Flyt',
-}
 const ERROR_LABELS: Record<string, string> = { ordstilling: 'Ordstilling', bøyning: 'Bøyning', ordvalg: 'Ordvalg', uttale: 'Uttale', annet: 'Annet' }
 
 watch(mode, () => quit())
@@ -552,53 +409,7 @@ const freeStats = computed(() => {
             <p v-if="aiError" class="mt-2 text-sm font-bold text-rod">{{ aiError }}</p>
           </div>
 
-          <div v-if="freeFb" class="pop mt-4 space-y-4 rounded-xl border-2 border-fjord bg-fjord-wash p-4">
-            <div class="flex flex-wrap items-baseline justify-between gap-2">
-              <p class="display text-lg font-black text-ink">Tilbakemelding</p>
-              <span class="chip bg-card text-fjord">Anslått nivå: {{ freeFb.level }}</span>
-            </div>
-            <p class="text-sm font-bold text-moss">{{ freeFb.praise }}</p>
-
-            <div class="grid gap-2 sm:grid-cols-5">
-              <div v-for="(label, k) in SCORE_LABELS" :key="k" class="rounded-lg bg-card p-2 text-center">
-                <p class="text-[11px] font-bold text-ink-faint">{{ label }}</p>
-                <p class="display text-xl font-black" :class="freeFb.scores[k] >= 4 ? 'text-moss' : freeFb.scores[k] >= 3 ? 'text-gull' : 'text-rod'">{{ freeFb.scores[k] }}/5</p>
-              </div>
-            </div>
-
-            <div>
-              <p class="kicker">Riktig og naturlig norsk</p>
-              <p class="mt-1 rounded-lg bg-card p-3 leading-relaxed text-ink">{{ freeFb.corrected }}</p>
-              <button v-if="ttsOk" class="btn btn-ghost mt-2 !py-1 text-sm" @click="speakNorwegian(freeFb.corrected, 0.9)">🔊 Hør den riktige versjonen</button>
-            </div>
-
-            <div v-if="freeFb.errors.length">
-              <p class="kicker">Feil å jobbe med</p>
-              <ul class="mt-1 space-y-2">
-                <li v-for="(e, i) in freeFb.errors" :key="i" class="rounded-lg bg-card p-3 text-sm">
-                  <span class="chip mr-1 bg-gull-wash text-gull">{{ ERROR_LABELS[e.type] ?? e.type }}</span>
-                  <span class="text-rod-deep line-through">{{ e.said }}</span>
-                  → <strong class="text-moss">{{ e.correct }}</strong>
-                  <p class="mt-1 text-ink-soft">{{ e.explanation }}</p>
-                </li>
-              </ul>
-            </div>
-            <p v-else class="text-sm font-bold text-moss">Ingen grammatikkfeil funnet 👏</p>
-
-            <div v-if="freeFb.pronunciation.score > 0">
-              <p class="kicker">Uttale: {{ freeFb.pronunciation.score }}/5</p>
-              <ul v-if="freeFb.pronunciation.notes.length" class="mt-1 space-y-1 text-sm">
-                <li v-for="(n, i) in freeFb.pronunciation.notes" :key="i">
-                  <strong class="text-ink">{{ n.word }}</strong>
-                  <button v-if="ttsOk" class="ml-1 text-xs" title="Hør ordet" @click="speakNorwegian(n.word, 0.8)">🔊</button>
-                  — <span class="text-ink-soft">{{ n.issue }}</span>
-                </li>
-              </ul>
-            </div>
-
-            <p class="rounded-lg bg-gull-wash p-3 text-sm text-ink"><strong>Neste gang:</strong> {{ freeFb.tip }}</p>
-            <p class="text-[11px] text-ink-faint">AI-vurderingen er veiledende og kan ta feil. Hørt av AI: «{{ freeFb.heard }}»</p>
-          </div>
+          <FreeFeedbackCard v-if="freeFb" class="mt-4" :fb="freeFb" />
         </template>
 
         <hr class="dotted-rule my-5" />

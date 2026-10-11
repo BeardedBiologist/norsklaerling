@@ -22,6 +22,7 @@ const nav = [
   { to: '/laer', label: 'Lær', name: 'learn' },
   { to: '/ord', label: 'Ord', name: 'flashcards' },
   { to: '/setninger', label: 'Setninger', name: 'sentences' },
+  { to: '/snakk', label: 'Snakk', name: 'speak' },
   { to: '/lytt', label: 'Lytt & snakk', name: 'listen' },
   { to: '/quiz', label: 'Quiz', name: 'quiz' },
   { to: '/statsborger', label: 'Statsborgerprøven', name: 'citizenship' },

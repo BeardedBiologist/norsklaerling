@@ -126,23 +126,51 @@ async function ask<T>(schema: ReturnType<typeof Schema.object>, prompt: string, 
 
 function friendlyError(e: unknown): Error {
   const msg = e instanceof Error ? e.message : String(e)
-  if (/quota|429|exhausted|rate/i.test(msg)) return new Error('Gratiskvoten er brukt opp for øyeblikket. Vent et minutt (eller til i morgen) og prøv igjen.')
-  if (/api.*not.*enabled|PERMISSION_DENIED|403|firebasevertexai|AI Logic/i.test(msg))
+  // classify by HTTP status / API error code — the request URL itself (…/models/x:generateContent on
+  // firebasevertexai.googleapis.com) appears in every message, so loose word matching misfires
+  if (/\[429\b|RESOURCE_EXHAUSTED|\bquota\b/i.test(msg))
+    return new Error('Gratiskvoten er brukt opp for øyeblikket. Vent et minutt (eller til i morgen) og prøv igjen.')
+  if (/App Check/i.test(msg))
+    return new Error('AI-en avviste forespørselen fordi App Check ikke er satt opp for nettstedet. (Firebase-konsollen → App Check.)')
+  if (/\[403\b|PERMISSION_DENIED|has not been used|is disabled/i.test(msg))
     return new Error('AI-tilbakemelding er ikke slått på ennå. Gå til Firebase-konsollen → AI Logic → Get started → Gemini Developer API.')
-  return new Error(`Fikk ikke kontakt med AI-tjenesten (${msg.slice(0, 120)}).`)
+  if (/Failed to fetch|NetworkError|network/i.test(msg)) return new Error('Ingen kontakt med AI-tjenesten — sjekk internettforbindelsen.')
+  return new Error(`AI-tjenesten svarte med en feil: ${msg.replace(/^AI: Error fetching from \S+: /, '').slice(0, 160)}`)
 }
 
 const EXAMINER = `You are an experienced, friendly examiner for Norskprøven (the Norwegian language test, oral part, levels A1–B2).
 The learner is an adult English speaker who has lived in Norway for years and is aiming for B1–B2.
 Judge ONLY what is actually in the recording. Use bokmål for all Norwegian. Be accurate but encouraging; do not invent mistakes.
 Count verb-second (V2) word order, "ikke" placement in subordinate clauses, noun gender/definite forms, adjective agreement and verb tenses as grammar errors.
+The answers are SPOKEN (except in dictation): never comment on capital letters, punctuation or spelling of a spoken answer — transcripts have none.
 List at most 8 errors, most important first. If the answer is empty or not Norwegian, say so in "tip" and give low scores.`
 
-export async function analyseFreeSpeech(opts: { question: string; transcript: string; audio: Blob | null; level: string }): Promise<FreeFeedback> {
+/** what a good answer looks like, per speaking-task type */
+const TASK_EXPECTATIONS: Record<string, string> = {
+  svar: 'Answer the question in full sentences, with a little detail.',
+  fortell: 'Tell what happened, mostly in the past tense, in a sensible order (først, så, etterpå, til slutt).',
+  beskriv: 'Describe clearly with suitable adjectives and place/time words.',
+  mening: 'State an opinion and justify it with at least two reasons and an example (fordi, derfor, for eksempel, på den ene/andre siden).',
+  sammenlign: 'Compare using comparatives and contrast words (mer/mindre … enn, ikke så … som, mens, derimot).',
+  presenter: 'Give a short structured presentation: introduction, main points, conclusion.',
+}
+
+export async function analyseFreeSpeech(opts: {
+  question: string
+  transcript: string
+  audio: Blob | null
+  level: string
+  /** speaking-task type, for task-specific expectations */
+  taskType?: string
+  /** words or phrases the task suggested */
+  hints?: string[]
+}): Promise<FreeFeedback> {
+  const expectation = opts.taskType && TASK_EXPECTATIONS[opts.taskType] ? `\nWhat a good answer does: ${TASK_EXPECTATIONS[opts.taskType]}` : ''
+  const hints = opts.hints?.length ? `\nSuggested phrases (using them is a plus, not a requirement): ${opts.hints.join(' | ')}` : ''
   const prompt = `${EXAMINER}
 
 Task the learner was answering (asked aloud in Norwegian): «${opts.question}»
-Course level of this task: ${opts.level}.
+Course level of this task: ${opts.level}. Score relative to what is expected at this level.${expectation}${hints}
 The browser's speech recognition produced this transcript (it may contain recognition mistakes — trust the audio when they disagree): «${opts.transcript}»
 
 Give structured feedback on the learner's spoken answer.`
@@ -179,4 +207,75 @@ export async function analyseSentence(opts: {
 
 ${TASKS[opts.task]({ target: opts.target, english: opts.english, answer: opts.answer })}`
   return ask<SentenceFeedback>(sentenceSchema, prompt, opts.task === 'diktat' ? null : opts.audio)
+}
+
+// ── conversations: the AI plays a role over several turns ──
+
+export interface ConversationLine {
+  who: 'ai' | 'learner'
+  text: string
+}
+
+export interface ConversationTurn {
+  heard: string
+  reply: string
+  notes: { word: string; issue: string }[]
+}
+
+const turnSchema = Schema.object({
+  properties: {
+    heard: Schema.string({ description: 'what the learner just said, transcribed from the audio in bokmål' }),
+    reply: Schema.string({ description: 'your next line in the role, in Norwegian' }),
+    notes: Schema.array({
+      items: Schema.object({
+        properties: { word: Schema.string(), issue: Schema.string({ description: 'pronunciation problem, in English' }) },
+      }),
+    }),
+  },
+})
+
+function transcriptOf(history: ConversationLine[]): string {
+  return history.map((l) => `${l.who === 'ai' ? 'DU (rollen)' : 'ELEVEN'}: ${l.text}`).join('\n')
+}
+
+/** one turn: hear the learner's answer and reply in the role */
+export async function conversationTurn(opts: {
+  role: string
+  goal: string
+  level: string
+  history: ConversationLine[]
+  transcript: string
+  audio: Blob | null
+  /** true when this should be the closing line */
+  last: boolean
+}): Promise<ConversationTurn> {
+  const prompt = `You are role-playing a short everyday conversation in Norwegian with an adult learner (level ${opts.level}) to practise speaking.
+Your role: ${opts.role}
+The learner's goal: ${opts.goal}
+Speak natural, simple bokmål suited to level ${opts.level}: one or two short sentences per line.
+Stay in the role. Never correct the learner during the conversation — feedback comes afterwards.
+${opts.last ? 'This is your LAST line: react briefly and close the conversation politely. Do not ask a new question.' : 'React to what the learner said and move the conversation forward with ONE question or prompt.'}
+In "notes", list at most two words the learner clearly mispronounced (empty if none or if there is no recording).
+
+Conversation so far:
+${transcriptOf(opts.history)}
+
+The learner's newest answer — browser transcript (may be imperfect, trust the audio): «${opts.transcript}»`
+  return ask<ConversationTurn>(turnSchema, prompt, opts.audio)
+}
+
+/** feedback on a whole conversation (text only — pronunciation notes come from the turns) */
+export async function conversationFeedback(opts: { role: string; goal: string; level: string; history: ConversationLine[] }): Promise<FreeFeedback> {
+  const prompt = `${EXAMINER}
+
+The learner just had a role-play conversation (level ${opts.level}).
+Role played by the other person: ${opts.role}
+The learner's goal: ${opts.goal}
+
+Conversation:
+${transcriptOf(opts.history)}
+
+Judge ONLY the learner's lines (ELEVEN). "task" = did they reach the goal and respond appropriately to what was said.
+"heard" = all the learner's lines joined together. "corrected" = the learner's lines rewritten correctly, one per line.`
+  return ask<FreeFeedback>(freeSchema, prompt, null)
 }
