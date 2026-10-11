@@ -10,7 +10,7 @@ import type { Level, VocabCard } from '../types'
 const progress = useProgressStore()
 
 const levelFilter = ref<Level | 'alle'>('alle')
-const levels: (Level | 'alle')[] = ['alle', 'A2', 'B1', 'B2']
+const levels: (Level | 'alle')[] = ['alle', 'A1', 'A2', 'B1', 'B2']
 type Kind = 'alle' | 'verb' | 'substantiv' | 'adjektiv'
 const kindFilter = ref<Kind>('alle')
 const kinds: { k: Kind; label: string }[] = [

@@ -1,17 +1,24 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { vocabulary } from '../data/vocabulary'
+import { chapterFromQuery, chapterLabel, chapterWords } from '../data/kurs'
 import { useProgressStore } from '../stores/progress'
 import { isDue } from '../lib/srs'
 import { shuffle } from '../lib/utils'
 import { inflectionLine } from '../lib/inflections'
 import { speakNorwegian, speechAvailable } from '../lib/speech'
+import { canSpeakCard, speakCard, wordAudioUrl } from '../lib/audio'
 import type { Grade, Level, VocabCard } from '../types'
 
 const progress = useProgressStore()
+const route = useRoute()
+
+/** ?kapittel=<id> narrows the deck to one course chapter */
+const chapter = computed(() => chapterFromQuery(route.query.kapittel))
 
 const levelFilter = ref<Level | 'alle'>('alle')
-const levels: (Level | 'alle')[] = ['alle', 'A2', 'B1', 'B2']
+const levels: (Level | 'alle')[] = ['alle', 'A1', 'A2', 'B1', 'B2']
 
 const SESSION_SIZE = 20
 
@@ -28,9 +35,9 @@ const mode = ref<'study' | 'learn'>('study')
 const showGenderQuiz = computed(() => genderMode.value && !!current.value?.gender && genderGuess.value === null)
 
 const pool = computed(() =>
-  vocabulary.filter(
-    (v) => levelFilter.value === 'alle' || v.level === levelFilter.value,
-  ),
+  chapter.value
+    ? chapterWords(chapter.value)
+    : vocabulary.filter((v) => levelFilter.value === 'alle' || v.level === levelFilter.value),
 )
 const duePool = computed(() => pool.value.filter((v) => isDue(progress.state.srs[v.id])))
 /** words never seen before — candidates for the learn mode */
@@ -117,9 +124,15 @@ const gradeButtons: { g: Grade; label: string; cls: string }[] = [
         <p v-if="mode === 'learn' && graded.again > 0" class="mt-1 text-xs text-ink-faint">
           Ordene i øvingskøen dukker opp i «Repeter»-økten om noen minutter.
         </p>
+        <RouterLink v-if="chapter" :to="`/kurs/${chapter.id}`" class="btn btn-accent mt-4 inline-flex">← Tilbake til kapittelet</RouterLink>
       </div>
 
       <div class="card rise rise-2 mt-6 p-6">
+        <div v-if="chapter" class="flex flex-wrap items-center justify-between gap-2">
+          <span class="chip bg-gull-wash text-gull">{{ chapterLabel(chapter) }}</span>
+          <RouterLink to="/ord" class="text-xs font-bold text-ink-faint no-underline hover:text-fjord">Vis alle nivåer i stedet</RouterLink>
+        </div>
+        <template v-else>
         <p class="mb-3 text-sm font-bold text-ink-soft">Velg nivå</p>
         <div class="flex flex-wrap gap-2">
           <button
@@ -132,6 +145,7 @@ const gradeButtons: { g: Grade; label: string; cls: string }[] = [
             {{ l === 'alle' ? 'Alle nivåer' : l }}
           </button>
         </div>
+        </template>
 
         <hr class="dotted-rule my-5" />
 
@@ -187,7 +201,7 @@ const gradeButtons: { g: Grade; label: string; cls: string }[] = [
         <p class="display text-center text-4xl font-black text-ink">
           <span v-if="current.gender" class="text-ink-faint">{{ current.gender }}&nbsp;</span>{{ current.no }}
         </p>
-        <button v-if="speechAvailable()" class="btn btn-ghost !py-1" @click="speakNorwegian(current.no)">🔊 Hør ordet</button>
+        <button v-if="canSpeakCard(current)" class="btn btn-ghost !py-1" :title="wordAudioUrl(current) ? 'Opptak fra NTNU' : 'Syntetisk stemme'" @click="speakCard(current)">🔊 Hør ordet</button>
 
         <p class="display text-2xl font-black text-fjord">{{ current.en }}</p>
         <p v-if="inflectionLine(current)" class="text-center text-sm font-medium text-ink-soft">
@@ -217,6 +231,7 @@ const gradeButtons: { g: Grade; label: string; cls: string }[] = [
       <div class="mt-6 flex items-center justify-between text-xs font-bold text-ink-faint">
         <span>{{ index + 1 }} / {{ session.length }}</span>
         <span class="chip" :class="{
+          'bg-gull-wash text-gull': current.level === 'A1',
           'bg-moss-wash text-moss': current.level === 'A2',
           'bg-fjord-wash text-fjord': current.level === 'B1',
           'bg-rod-wash text-rod-deep': current.level === 'B2',
@@ -270,8 +285,12 @@ const gradeButtons: { g: Grade; label: string; cls: string }[] = [
           <p v-if="inflectionLine(current)" class="text-center text-sm font-medium text-ink-soft">
             {{ inflectionLine(current) }}
           </p>
+          <button v-if="canSpeakCard(current)" class="btn btn-ghost !py-1 text-sm" @click="speakCard(current)">🔊 Hør ordet</button>
           <hr class="dotted-rule w-24" />
-          <p class="text-center italic text-ink">«{{ current.example }}»</p>
+          <p class="text-center italic text-ink">
+            «{{ current.example }}»
+            <button v-if="speechAvailable()" class="ml-1 text-sm not-italic" title="Hør setningen" @click="speakNorwegian(current.example)">🔊</button>
+          </p>
           <p class="text-center text-sm text-ink-faint">{{ current.exampleEn }}</p>
         </template>
       </div>

@@ -18,9 +18,11 @@ const syncLabel: Record<string, string> = {
 
 const nav = [
   { to: '/', label: 'Hjem', name: 'home' },
+  { to: '/kurs', label: 'Reisen', name: 'kurs' },
   { to: '/laer', label: 'Lær', name: 'learn' },
   { to: '/ord', label: 'Ord', name: 'flashcards' },
   { to: '/setninger', label: 'Setninger', name: 'sentences' },
+  { to: '/lytt', label: 'Lytt & snakk', name: 'listen' },
   { to: '/quiz', label: 'Quiz', name: 'quiz' },
   { to: '/statsborger', label: 'Statsborgerprøven', name: 'citizenship' },
   { to: '/oversett', label: 'Oversett', name: 'translate' },
@@ -48,7 +50,7 @@ const nav = [
           <span class="display text-2xl font-black tracking-tight text-ink">
             Norsk<em class="text-rod not-italic font-black">Lærling</em>
           </span>
-          <span class="kicker hidden sm:inline">A2 → B1 → B2</span>
+          <span class="kicker hidden sm:inline">A1 → A2 → B1 → B2</span>
         </RouterLink>
 
         <div class="flex items-center gap-2">

@@ -5,15 +5,26 @@ export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', name: 'home', component: HomeView },
+    { path: '/kurs', name: 'kurs', component: () => import('./views/KursView.vue') },
+    { path: '/kurs/:id/prove', name: 'kurs-test', component: () => import('./views/KursTestView.vue') },
+    { path: '/kurs/:id', name: 'kurs-chapter', component: () => import('./views/KursChapterView.vue') },
     { path: '/laer', name: 'learn', component: () => import('./views/LearnView.vue') },
     { path: '/laer/:id', name: 'lesson', component: () => import('./views/LessonView.vue') },
     { path: '/ord', name: 'flashcards', component: () => import('./views/FlashcardsView.vue') },
     { path: '/setninger', name: 'sentences', component: () => import('./views/SentenceBuilderView.vue') },
     { path: '/quiz', name: 'quiz', component: () => import('./views/QuizView.vue') },
     { path: '/statsborger', name: 'citizenship', component: () => import('./views/CitizenshipView.vue') },
+    { path: '/lytt', name: 'listen', component: () => import('./views/ListenSpeakView.vue') },
     { path: '/oversett', name: 'translate', component: () => import('./views/TranslateView.vue') },
     { path: '/boyning', name: 'inflection', component: () => import('./views/InflectionView.vue') },
     { path: '/innstillinger', name: 'settings', component: () => import('./views/SettingsView.vue') },
   ],
-  scrollBehavior: () => ({ top: 0 }),
+  scrollBehavior: (to) =>
+    // the chapter page opens the right step and scrolls to its items itself
+    to.hash && to.name === 'kurs-chapter'
+      ? false
+      : to.hash
+      ? // lazy-loaded views render after navigation, so wait a moment before looking for the anchor
+        new Promise((resolve) => setTimeout(() => resolve({ el: to.hash, top: 240, behavior: 'smooth' }), 300))
+      : { top: 0 },
 })

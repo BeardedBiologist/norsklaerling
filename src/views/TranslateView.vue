@@ -9,7 +9,7 @@ import type { Level } from '../types'
 const progress = useProgressStore()
 
 const levelFilter = ref<Level | 'alle'>('alle')
-const levels: (Level | 'alle')[] = ['alle', 'A2', 'B1', 'B2']
+const levels: (Level | 'alle')[] = ['alle', 'A1', 'A2', 'B1', 'B2']
 
 const session = ref<TranslationExercise[]>([])
 const index = ref(0)

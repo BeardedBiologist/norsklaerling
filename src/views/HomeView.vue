@@ -2,8 +2,12 @@
 import { computed } from 'vue'
 import { useProgressStore } from '../stores/progress'
 import { vocabulary } from '../data/vocabulary'
+import { courses } from '../data/kurs'
+import { useJourney } from '../lib/journey'
 
 const progress = useProgressStore()
+const journey = useJourney()
+const journeyPct = computed(() => Math.round(journey.overall.value * 100))
 
 const learnedPct = computed(() =>
   Math.round((progress.learnedCount / vocabulary.length) * 100),
@@ -17,10 +21,18 @@ const quizAccuracy = computed(() =>
 
 const modules = [
   {
+    to: '/kurs',
+    no: 'Kurs',
+    title: 'Reisen A1 → B1',
+    desc: 'Nybegynnerkurs (12 kapitler, etter NTNUs LearnNoW) og B1-kurs (10 kapitler, etter NoW2) — grammatikk, ord, uttale og muntlige øvelser.',
+    accent: 'gull',
+    number: 'A1',
+  },
+  {
     to: '/laer',
     no: 'Lær',
     title: 'Leksjoner',
-    desc: 'Start her: grammatikk forklart på engelsk og hele pensumet til statsborgerprøven — lær først, test etterpå.',
+    desc: 'Når grunnmuren sitter: B1-grammatikk forklart på engelsk og hele pensumet til statsborgerprøven — lær først, test etterpå.',
     accent: 'moss',
     number: '00',
   },
@@ -28,7 +40,7 @@ const modules = [
     to: '/ord',
     no: 'Ord',
     title: 'Ordforråd',
-    desc: `Flashcards med smart repetisjon. ${vocabulary.length} ord fra A2 til B2 med eksempler og uttale.`,
+    desc: `Flashcards med smart repetisjon. ${vocabulary.length} ord fra A1 til B2 med eksempler og uttale.`,
     accent: 'rod',
     number: '01',
   },
@@ -55,6 +67,14 @@ const modules = [
     desc: 'Øv på samfunnskunnskap — eller ta full prøvesimulering: 36 spørsmål, 60 minutter.',
     accent: 'gull',
     number: '04',
+  },
+  {
+    to: '/lytt',
+    no: 'Lytt',
+    title: 'Lytt og snakk',
+    desc: 'Diktat, hør-og-gjenta, si det på norsk og fri muntlig trening med mikrofon — med tilbakemelding ord for ord.',
+    accent: 'moss',
+    number: '07',
   },
   {
     to: '/oversett',
@@ -85,10 +105,39 @@ const modules = [
         <em class="text-fjord">Nå skal vi bevise det.</em>
       </h1>
       <p class="mt-4 max-w-2xl text-ink-soft">
-        Ti år i Norge er verdt mer enn du tror — men prøvene krever system. Denne appen
-        drilller ordforråd, ordstilling og samfunnskunnskap til du består
+        Ti år i Norge er verdt mer enn du tror — men prøvene krever system. Vi bygger
+        grunnmuren fra A1, og så drilller vi ordforråd, ordstilling og samfunnskunnskap til du består
         <strong>muntlig B1</strong> og <strong>statsborgerprøven</strong>.
       </p>
+      <!-- the journey: pick up exactly where you left off -->
+      <div class="card mt-6 max-w-2xl border-l-4 border-l-gull p-5">
+        <div class="flex items-center justify-between text-sm font-bold">
+          <span class="kicker">Reisen din</span>
+          <span class="text-ink-faint">{{ journeyPct }} % fullført</span>
+        </div>
+        <div class="mt-2 h-2 overflow-hidden rounded-full bg-paper-warm">
+          <div class="h-full rounded-full bg-moss" :style="{ width: journeyPct + '%' }" />
+        </div>
+        <template v-if="journey.current.value">
+          <p class="display mt-3 text-xl font-black text-ink">
+            {{ courses[journey.current.value.chapter.course].title }} · kapittel {{ journey.current.value.chapter.n }}: {{ journey.current.value.chapter.title }}
+          </p>
+          <p v-if="journey.current.value.next" class="text-sm text-ink-soft">
+            Neste: {{ journey.current.value.next.step.icon }} {{ journey.current.value.next.item.label }} · {{ journey.passedCount.value }} av 22 kapitler bestått
+          </p>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <RouterLink
+              :to="journey.current.value.next ? journey.itemLink(journey.current.value.chapter, journey.current.value.next.item) : `/kurs/${journey.current.value.chapter.id}`"
+              class="btn btn-accent"
+            >
+              {{ journeyPct === 0 ? 'Start reisen' : 'Fortsett der du slapp' }} →
+            </RouterLink>
+            <RouterLink :to="`/kurs/${journey.current.value.chapter.id}`" class="btn btn-ghost">Åpne kapittelet</RouterLink>
+            <RouterLink to="/kurs" class="btn btn-ghost">Se hele reisen</RouterLink>
+          </div>
+        </template>
+        <p v-else class="mt-3 font-bold text-moss">Hele reisen er fullført! 🎉</p>
+      </div>
     </section>
 
     <!-- stats -->

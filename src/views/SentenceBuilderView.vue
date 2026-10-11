@@ -1,15 +1,24 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { sentences } from '../data/sentences'
+import { chapterFromQuery, chapterLabel, kursSentences } from '../data/kurs'
 import { useProgressStore } from '../stores/progress'
 import { shuffle } from '../lib/utils'
 import { speakNorwegian, speechAvailable } from '../lib/speech'
 import type { Level, SentenceExercise } from '../types'
 
 const progress = useProgressStore()
+const route = useRoute()
+
+/** ?kapittel=<id> drills only that course chapter */
+const chapter = computed(() => chapterFromQuery(route.query.kapittel))
+
+/** listening mode: hear the Norwegian sentence instead of reading the English (?lytt=1) */
+const listenMode = ref(route.query.lytt === '1')
 
 const levelFilter = ref<Level | 'alle'>('alle')
-const levels: (Level | 'alle')[] = ['alle', 'A2', 'B1', 'B2']
+const levels: (Level | 'alle')[] = ['alle', 'A1', 'A2', 'B1', 'B2']
 
 interface Tile {
   word: string
@@ -37,12 +46,19 @@ function loadExercise() {
   built.value = []
   status.value = 'building'
   showHint.value = false
+  if (listenMode.value) playSentence()
+}
+
+function playSentence(rate = 0.9) {
+  if (current.value && speechAvailable()) speakNorwegian(current.value.no, rate)
 }
 
 function start() {
-  const pool = sentences.filter(
-    (s) => levelFilter.value === 'alle' || s.level === levelFilter.value,
-  )
+  const pool = chapter.value
+    ? chapter.value.sentences
+    : [...kursSentences, ...sentences].filter(
+        (s) => levelFilter.value === 'alle' || s.level === levelFilter.value,
+      )
   session.value = shuffle(pool).slice(0, 10)
   index.value = 0
   score.value = 0
@@ -95,6 +111,7 @@ function next() {
   if (index.value + 1 >= session.value.length) {
     done.value = true
     progress.recordQuiz('sentences', score.value, session.value.length)
+    if (chapter.value) progress.recordStep(chapter.value.id, listenMode.value ? 'bygg-lytt' : 'bygg', score.value / session.value.length)
   } else {
     index.value++
     loadExercise()
@@ -116,9 +133,15 @@ function next() {
         <p class="mt-2 text-sm text-ink-soft">
           {{ score >= session.length * 0.7 ? 'Solid! Ordstillingen sitter bedre og bedre.' : 'Fortsett å øve — V2-regelen kommer med repetisjon.' }}
         </p>
+        <RouterLink v-if="chapter" :to="`/kurs/${chapter.id}`" class="btn btn-accent mt-4 inline-flex">← Tilbake til kapittelet</RouterLink>
       </div>
 
       <div class="card rise rise-2 mt-6 p-6">
+        <div v-if="chapter" class="flex flex-wrap items-center justify-between gap-2">
+          <span class="chip bg-gull-wash text-gull">{{ chapterLabel(chapter) }}</span>
+          <RouterLink to="/setninger" class="text-xs font-bold text-ink-faint no-underline hover:text-fjord">Vis alle nivåer i stedet</RouterLink>
+        </div>
+        <template v-else>
         <p class="mb-3 text-sm font-bold text-ink-soft">Velg nivå</p>
         <div class="flex flex-wrap gap-2">
           <button
@@ -131,8 +154,15 @@ function next() {
             {{ l === 'alle' ? 'Alle nivåer' : l }}
           </button>
         </div>
+        </template>
         <hr class="dotted-rule my-5" />
-        <button class="btn btn-accent w-full" @click="start">Start 10 setninger</button>
+        <label v-if="speechAvailable()" class="mb-4 flex cursor-pointer items-center gap-3">
+          <input v-model="listenMode" type="checkbox" class="h-4 w-4 accent-fjord" />
+          <span class="text-sm font-medium text-ink">🎧 Lyttemodus: hør setningen på norsk i stedet for å lese den på engelsk</span>
+        </label>
+        <button class="btn btn-accent w-full" @click="start">
+          {{ chapter ? 'Start kapittelets setninger' : 'Start 10 setninger' }}
+        </button>
       </div>
     </template>
 
@@ -144,8 +174,18 @@ function next() {
       </div>
 
       <div class="card mt-4 p-6">
-        <p class="kicker">Oversett og bygg setningen</p>
-        <p class="display mt-1 text-xl font-bold text-ink">“{{ current.en }}”</p>
+        <template v-if="listenMode">
+          <p class="kicker">Hør og bygg setningen</p>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <button class="btn btn-primary" @click="playSentence()">🔊 Hør igjen</button>
+            <button class="btn btn-ghost" @click="playSentence(0.6)">🐢 Sakte</button>
+          </div>
+          <p v-if="status === 'correct'" class="mt-3 text-sm italic text-ink-faint">“{{ current.en }}”</p>
+        </template>
+        <template v-else>
+          <p class="kicker">Oversett og bygg setningen</p>
+          <p class="display mt-1 text-xl font-bold text-ink">“{{ current.en }}”</p>
+        </template>
 
         <!-- built sentence -->
         <div

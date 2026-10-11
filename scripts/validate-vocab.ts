@@ -17,8 +17,10 @@ const cache: Record<string, { ids: number[]; genders: string[] } | null> = exist
   ? JSON.parse(readFileSync(CACHE_FILE, 'utf8'))
   : {}
 
-const LEVELS = new Set(['A2', 'B1', 'B2'])
-const TYPES = new Set(['substantiv', 'verb', 'adjektiv', 'adverb', 'uttrykk', 'preposisjon'])
+const LEVELS = new Set(['A1', 'A2', 'B1', 'B2'])
+const TYPES = new Set([
+  'substantiv', 'verb', 'adjektiv', 'adverb', 'uttrykk', 'preposisjon', 'pronomen', 'konjunksjon', 'tallord',
+])
 const GENDERS = new Set(['en', 'ei', 'et'])
 const GENDER_TAG: Record<string, string> = { en: 'Masc', ei: 'Fem', et: 'Neuter' }
 
@@ -45,6 +47,8 @@ for (const c of vocabulary) {
     warnings.push(`noun without gender: ${where}`)
   for (const f of ['no', 'en', 'example', 'exampleEn'] as const)
     if (!c[f]?.trim()) errors.push(`EMPTY FIELD ${f}: ${where}`)
+  if (c.chapter !== undefined && !/^(b1-)?\d{1,2}$/.test(c.chapter))
+    errors.push(`BAD CHAPTER "${c.chapter}": ${where}`)
   if (/^(en|ei|et) /.test(c.no) && c.type === 'substantiv')
     warnings.push(`headword still has article: ${where}`)
 }

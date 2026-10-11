@@ -1,14 +1,20 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { grammarQuiz } from '../data/grammarQuiz'
+import { chapterFromQuery, chapterLabel, kursQuiz } from '../data/kurs'
 import { useProgressStore } from '../stores/progress'
 import { permutation, shuffle } from '../lib/utils'
 import type { Level, QuizQuestion } from '../types'
 
 const progress = useProgressStore()
+const route = useRoute()
+
+/** ?kapittel=<id> runs that course chapter's check */
+const chapter = computed(() => chapterFromQuery(route.query.kapittel))
 
 const levelFilter = ref<Level | 'alle'>('alle')
-const levels: (Level | 'alle')[] = ['alle', 'A2', 'B1', 'B2']
+const levels: (Level | 'alle')[] = ['alle', 'A1', 'A2', 'B1', 'B2']
 
 interface ActiveQuestion {
   q: QuizQuestion
@@ -25,9 +31,11 @@ const done = ref(false)
 const current = computed(() => session.value[index.value])
 
 function start() {
-  const pool = grammarQuiz.filter(
-    (q) => levelFilter.value === 'alle' || q.level === levelFilter.value,
-  )
+  const pool = chapter.value
+    ? chapter.value.quiz
+    : [...kursQuiz, ...grammarQuiz].filter(
+        (q) => levelFilter.value === 'alle' || q.level === levelFilter.value,
+      )
   session.value = shuffle(pool)
     .slice(0, 10)
     .map((q) => {
@@ -54,6 +62,7 @@ function next() {
   if (index.value + 1 >= session.value.length) {
     done.value = true
     progress.recordQuiz('grammar', score.value, session.value.length)
+    if (chapter.value) progress.recordStep(chapter.value.id, 'sjekk', score.value / session.value.length)
   } else {
     index.value++
     selected.value = null
@@ -75,15 +84,21 @@ function optionClass(i: number): string {
 
     <template v-if="session.length === 0 || done">
       <div v-if="done" class="card pop mt-6 p-6 text-center">
-        <p class="display text-2xl font-black" :class="score >= 7 ? 'text-moss' : 'text-gull'">
+        <p class="display text-2xl font-black" :class="score >= session.length * 0.7 ? 'text-moss' : 'text-gull'">
           {{ score }} av {{ session.length }} riktige
         </p>
         <p class="mt-2 text-sm text-ink-soft">
-          {{ score >= 7 ? 'Sterkt! Dette lover godt for norskprøven.' : 'Les forklaringene nøye — reglene setter seg etter hvert.' }}
+          {{ score >= session.length * 0.7 ? 'Sterkt! Dette lover godt for norskprøven.' : 'Les forklaringene nøye — reglene setter seg etter hvert.' }}
         </p>
+        <RouterLink v-if="chapter" :to="`/kurs/${chapter.id}`" class="btn btn-accent mt-4 inline-flex">← Tilbake til kapittelet</RouterLink>
       </div>
 
       <div class="card rise rise-2 mt-6 p-6">
+        <div v-if="chapter" class="flex flex-wrap items-center justify-between gap-2">
+          <span class="chip bg-gull-wash text-gull">{{ chapterLabel(chapter) }}</span>
+          <RouterLink to="/quiz" class="text-xs font-bold text-ink-faint no-underline hover:text-fjord">Vis alle nivåer i stedet</RouterLink>
+        </div>
+        <template v-else>
         <p class="mb-3 text-sm font-bold text-ink-soft">Velg nivå</p>
         <div class="flex flex-wrap gap-2">
           <button
@@ -96,8 +111,11 @@ function optionClass(i: number): string {
             {{ l === 'alle' ? 'Alle nivåer' : l }}
           </button>
         </div>
+        </template>
         <hr class="dotted-rule my-5" />
-        <button class="btn btn-accent w-full" @click="start">Start quiz (10 spørsmål)</button>
+        <button class="btn btn-accent w-full" @click="start">
+          {{ chapter ? 'Start kapittelsjekken' : 'Start quiz (10 spørsmål)' }}
+        </button>
       </div>
     </template>
 

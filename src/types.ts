@@ -1,6 +1,15 @@
-export type Level = 'A2' | 'B1' | 'B2'
+export type Level = 'A1' | 'A2' | 'B1' | 'B2'
 
-export type WordType = 'substantiv' | 'verb' | 'adjektiv' | 'adverb' | 'uttrykk' | 'preposisjon'
+export type WordType =
+  | 'substantiv'
+  | 'verb'
+  | 'adjektiv'
+  | 'adverb'
+  | 'uttrykk'
+  | 'preposisjon'
+  | 'pronomen'
+  | 'konjunksjon'
+  | 'tallord'
 
 export interface VocabCard {
   id: string
@@ -13,6 +22,8 @@ export interface VocabCard {
   exampleEn: string
   level: Level
   topic: string
+  /** id of the course chapter that introduces the word (see KursChapter.id) */
+  chapter?: string
 }
 
 export interface SentenceExercise {
@@ -92,3 +103,45 @@ export interface SrsState {
 }
 
 export type Grade = 'again' | 'hard' | 'good' | 'easy'
+
+/** nybegynner = A1–A2 after NTNU LearnNoW · b1 = A2–B1 after NTNU NoW2 */
+export type KursCourse = 'nybegynner' | 'b1'
+
+/** one chapter of a course, sequenced after the matching NTNU course */
+export interface KursChapter {
+  /** unique id used in URLs, progress and VocabCard.chapter: '3' or 'b1-3' */
+  id: string
+  course: KursCourse
+  /** chapter number within the course, also NTNU's chapter number */
+  n: number
+  title: string
+  titleEn: string
+  level: Level
+  /** situations the chapter's dialogues cover, in English */
+  theme: string
+  /** what you can do after the chapter */
+  canDo: LessonExample[]
+  /** NTNU text titles in order (LearnNoW: A–D, NoW2: A, B, X), linked for audio + text */
+  dialogues: string[]
+  /** everyday phrases to learn as chunks */
+  phrases: LessonExample[]
+  /** grammar explained in English, in LearnNoW's order */
+  grammar: LessonSection[]
+  /** one pronunciation focus */
+  pronunciation: LessonSection
+  /** questions to answer out loud — oral practice from day one */
+  speaking: string[]
+  /** chapter check; correct answer is always index 0 */
+  quiz: QuizQuestion[]
+  /** word-order drills */
+  sentences: SentenceExercise[]
+}
+
+/** one comprehension question about an NTNU text; correct answer is always index 0 */
+export interface ListeningQuestion {
+  q: string
+  /** English translation of the question, for the early chapters */
+  en?: string
+  options: string[]
+  answer: number
+}
