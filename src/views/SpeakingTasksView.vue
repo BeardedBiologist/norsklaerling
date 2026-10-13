@@ -17,6 +17,7 @@ import {
   type FreeFeedback,
 } from '../lib/ai'
 import FreeFeedbackCard from '../components/FreeFeedbackCard.vue'
+import { feedbackDateLabel, loadFeedback, saveFeedback } from '../lib/savedFeedback'
 import { deleteRecording, loadRecording, saveRecording, savedAtLabel, type SavedRecording } from '../lib/savedRecordings'
 import type { SpeakingTask, SpeakingTaskType } from '../types'
 
@@ -93,9 +94,29 @@ const saved = ref<SavedRecording<ConvState> | null>(null)
 /** resend the call that just failed */
 const retry = ref<(() => void) | null>(null)
 
-async function checkSaved(t: SpeakingTask) {
-  const rec = await loadRecording<ConvState>(savedKey(t))
-  if (active.value?.id === t.id && !feedback.value && !listening.value && learnerTurns.value === 0) saved.value = rec
+/** when the feedback on screen is a saved one from earlier (epoch ms) */
+const savedFeedbackAt = ref<number | null>(null)
+
+/**
+ * On opening a task: show the latest saved AI feedback (also from other
+ * devices), or offer a newer recording the AI never judged.
+ */
+async function restore(t: SpeakingTask, fresh: boolean) {
+  const [prev, rec] = await Promise.all([fresh ? null : loadFeedback<FreeFeedback>(savedKey(t)), loadRecording<ConvState>(savedKey(t))])
+  if (active.value?.id !== t.id || feedback.value || listening.value || aiLoading.value || learnerTurns.value > 0) return
+  if (prev && (!rec || prev.at >= rec.at)) {
+    feedback.value = prev.fb
+    passedNow.value = passesTask(prev.fb.scores, chapter.value)
+    savedFeedbackAt.value = prev.at
+    if (prev.transcript) transcript.value = prev.transcript
+    if (prev.history?.length) {
+      history.value = prev.history
+      turnNotes.value = prev.notes ?? []
+      convDone.value = true
+    }
+    return
+  }
+  saved.value = rec
 }
 
 function discardSaved() {
@@ -119,7 +140,7 @@ function useSaved() {
   }
 }
 
-function open(t: SpeakingTask) {
+function open(t: SpeakingTask, fresh = false) {
   capture.release()
   capture.clear()
   stopAudio()
@@ -132,7 +153,8 @@ function open(t: SpeakingTask) {
   convDone.value = false
   saved.value = null
   retry.value = null
-  void checkSaved(t)
+  savedFeedbackAt.value = null
+  void restore(t, fresh)
   if (t.type === 'samtale' && t.role) {
     history.value = [{ who: 'ai', text: t.role.opening }]
     setTimeout(() => say(t.role!.opening), 300)
@@ -159,10 +181,14 @@ function record(fb: FreeFeedback) {
   progress.recordStep(chapter.value.id, taskScoreKey(t), (s.task + s.coherence + s.vocabulary + s.grammar + s.fluency) / 25)
   passedNow.value = passesTask(s, chapter.value)
   if (passedNow.value) progress.recordStep(chapter.value.id, taskPassKey(t), 1)
+  savedFeedbackAt.value = null
+  const conv = t.type === 'samtale'
+  void saveFeedback(savedKey(t), conv ? { fb, history: history.value, notes: turnNotes.value } : { fb, transcript: transcript.value })
 }
 
 /** single answer */
 function startAnswer() {
+  savedFeedbackAt.value = null
   feedback.value = null
   passedNow.value = null
   aiError.value = ''
@@ -400,9 +426,10 @@ watch(
         <p class="mt-4 rounded-lg p-3 font-bold" :class="passedNow ? 'bg-moss-wash text-moss' : 'bg-gull-wash text-gull'">
           {{ passedNow ? 'Bestått ✓ — oppgaven teller for kapittelet' : 'Ikke bestått ennå — se tilbakemeldingen og prøv igjen' }}
         </p>
+        <p v-if="savedFeedbackAt" class="mt-2 text-xs text-ink-faint">Siste tilbakemelding fra AI-en · {{ feedbackDateLabel(savedFeedbackAt) }}</p>
         <FreeFeedbackCard class="mt-3" :fb="feedback" :extra-notes="turnNotes" />
         <div class="mt-4 flex flex-wrap gap-2">
-          <button class="btn btn-ghost" @click="open(active)">Prøv igjen</button>
+          <button class="btn btn-ghost" @click="open(active, true)">Prøv igjen</button>
           <button v-if="nextTask" class="btn btn-accent" @click="open(nextTask)">Neste oppgave →</button>
         </div>
       </template>

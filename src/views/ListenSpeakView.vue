@@ -9,6 +9,7 @@ import { speakNorwegian, speechAvailable } from '../lib/speech'
 import { stopAudio } from '../lib/audio'
 import { speakingSupported, useSpeechCapture } from '../lib/useSpeechCapture'
 import { compareSentence, normalizeWords, type Comparison } from '../lib/compare'
+import { feedbackDateLabel, loadFeedback, saveFeedback, type StoredFeedback } from '../lib/savedFeedback'
 import { deleteRecording, loadRecording, saveRecording, savedAtLabel, type SavedRecording } from '../lib/savedRecordings'
 import { aiAvailable, analyseFreeSpeech, analyseSentence, type FreeFeedback, type SentenceFeedback, type SentenceTask } from '../lib/ai'
 import FreeFeedbackCard from '../components/FreeFeedbackCard.vue'
@@ -222,14 +223,25 @@ function itemKey(): string | null {
 
 /** a recording of this item that the AI never judged (e.g. before a reload) */
 const saved = ref<SavedRecording | null>(null)
+/** the AI's feedback the last time this item was answered (any device) */
+const previous = ref<StoredFeedback<FreeFeedback | SentenceFeedback> | null>(null)
 /** the audio of a saved recording being resent (there is no live recording after a reload) */
 const restoredAudio = shallowRef<Blob | null>(null)
 async function checkSaved() {
   saved.value = null
-  const key = itemKey()
+  previous.value = null
+  const key = feedbackKey()
   if (!aiOk || !key) return
-  const rec = await loadRecording(key)
-  if (itemKey() === key && !hasRecording.value && !listening.value) saved.value = rec
+  const [rec, prev] = await Promise.all([mode.value === 'diktat' ? null : loadRecording(key), loadFeedback<FreeFeedback | SentenceFeedback>(key)])
+  if (feedbackKey() !== key) return
+  previous.value = prev
+  if (!hasRecording.value && !listening.value && (!prev || !rec || rec.at > prev.at)) saved.value = rec
+}
+
+/** dictation too has AI feedback worth keeping */
+function feedbackKey(): string | null {
+  if (mode.value === 'diktat') return current.value ? `lytt-diktat-${current.value.no}` : null
+  return itemKey()
 }
 function useSaved() {
   const rec = saved.value
@@ -283,12 +295,17 @@ async function askAi() {
       }
     }
     if (key) void deleteRecording(key)
+    const fbKey = feedbackKey()
+    const fb = freeFb.value ?? sentFb.value
+    if (fbKey && fb) void saveFeedback(fbKey, { fb, transcript: mode.value === 'diktat' ? typed.value : transcript.value })
   } catch (e) {
     aiError.value = e instanceof Error ? e.message : String(e)
   } finally {
     aiLoading.value = false
   }
 }
+
+const isFreeFb = (fb: FreeFeedback | SentenceFeedback): fb is FreeFeedback => 'scores' in fb
 
 const ERROR_LABELS: Record<string, string> = { ordstilling: 'Ordstilling', bøyning: 'Bøyning', ordvalg: 'Ordvalg', uttale: 'Uttale', annet: 'Annet' }
 
@@ -454,6 +471,19 @@ const freeStats = computed(() => {
               <li>☐ Begrunnet jeg meningen min med et eksempel?</li>
             </ul>
           </div>
+          <details v-if="aiOk && previous && !freeFb && !sentFb && !listening && !aiLoading" class="mt-4 rounded-xl border border-rule bg-paper p-3 text-sm">
+            <summary class="cursor-pointer font-bold text-ink-soft">Forrige tilbakemelding fra AI-en · {{ feedbackDateLabel(previous.at) }}</summary>
+            <p v-if="previous.transcript" class="mt-2 text-ink-soft">Du sa: <em class="text-ink">«{{ previous.transcript }}»</em></p>
+            <FreeFeedbackCard v-if="isFreeFb(previous.fb)" class="mt-2" :fb="previous.fb" />
+            <template v-else>
+              <p class="mt-2 font-bold" :class="previous.fb.correct ? 'text-moss' : 'text-gull'">{{ previous.fb.correct ? 'Godtatt ✓' : 'Ikke helt riktig' }}</p>
+              <p v-if="previous.fb.corrected" class="mt-1 text-ink">Riktig: <strong>{{ previous.fb.corrected }}</strong></p>
+              <ul v-if="previous.fb.errors.length" class="mt-1 list-disc pl-5 text-ink-soft">
+                <li v-for="(e, ei) in previous.fb.errors" :key="ei"><strong class="text-ink">{{ e.said }} → {{ e.correct }}</strong> — {{ e.explanation }}</li>
+              </ul>
+              <p v-if="previous.fb.tip" class="mt-1 text-ink-soft">💡 {{ previous.fb.tip }}</p>
+            </template>
+          </details>
           <div v-if="aiOk" class="mt-4">
             <p v-if="aiLoading" class="text-sm font-bold text-fjord">🤖 AI-en lytter til svaret ditt … <span class="font-normal text-ink-faint">(kan ta opptil et minutt)</span></p>
             <button v-else-if="!freeFb" class="btn btn-primary" :disabled="listening" @click="askAi">{{ aiError ? '🔁 Send samme opptak på nytt' : '🤖 Få tilbakemelding fra AI' }}</button>
@@ -563,6 +593,19 @@ const freeStats = computed(() => {
           </p>
         </div>
 
+        <details v-if="aiOk && previous && !freeFb && !sentFb && !listening && !aiLoading" class="mt-4 rounded-xl border border-rule bg-paper p-3 text-sm">
+          <summary class="cursor-pointer font-bold text-ink-soft">Forrige tilbakemelding fra AI-en · {{ feedbackDateLabel(previous.at) }}</summary>
+          <p v-if="previous.transcript" class="mt-2 text-ink-soft">Du {{ mode === 'diktat' ? 'skrev' : 'sa' }}: <em class="text-ink">«{{ previous.transcript }}»</em></p>
+          <FreeFeedbackCard v-if="isFreeFb(previous.fb)" class="mt-2" :fb="previous.fb" />
+          <template v-else>
+            <p class="mt-2 font-bold" :class="previous.fb.correct ? 'text-moss' : 'text-gull'">{{ previous.fb.correct ? 'Godtatt ✓' : 'Ikke helt riktig' }}</p>
+            <p v-if="previous.fb.corrected" class="mt-1 text-ink">Riktig: <strong>{{ previous.fb.corrected }}</strong></p>
+            <ul v-if="previous.fb.errors.length" class="mt-1 list-disc pl-5 text-ink-soft">
+              <li v-for="(e, ei) in previous.fb.errors" :key="ei"><strong class="text-ink">{{ e.said }} → {{ e.correct }}</strong> — {{ e.explanation }}</li>
+            </ul>
+            <p v-if="previous.fb.tip" class="mt-1 text-ink-soft">💡 {{ previous.fb.tip }}</p>
+          </template>
+        </details>
         <!-- AI feedback (all sentence modes) -->
         <div v-if="aiOk && !listening && (mode === 'diktat' ? !!result : !!transcript || hasRecording || !!restoredAudio)" class="mt-4">
           <p v-if="aiLoading" class="text-sm font-bold text-fjord">🤖 AI-en ser på svaret ditt … <span class="font-normal text-ink-faint">(kan ta opptil et minutt)</span></p>

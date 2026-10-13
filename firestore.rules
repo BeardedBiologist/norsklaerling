@@ -4,6 +4,10 @@ service cloud.firestore {
     // each signed-in user can read/write only their own progress document
     match /users/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
+      // the latest AI feedback per speaking task
+      match /feedback/{key} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
     }
     match /{document=**} {
       allow read, write: if false;
