@@ -99,7 +99,11 @@ function model(name: string, schema: ReturnType<typeof Schema.object>): Generati
   const ai = getAI(firebaseApp!, { backend: new GoogleAIBackend() })
   return getGenerativeModel(ai, {
     model: name,
-    generationConfig: { responseMimeType: 'application/json', responseSchema: schema, temperature: 0.2 },
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: schema,
+      temperature: 0.2,
+    },
   })
 }
 
@@ -114,15 +118,44 @@ async function ask<T>(schema: ReturnType<typeof Schema.object>, prompt: string, 
   if (audio) parts.push({ inlineData: { mimeType: 'audio/wav', data: await blobToWavBase64(audio) } })
   let lastError: unknown
   for (const name of MODELS) {
-    try {
-      const res = await model(name, schema).generateContent(parts)
-      return JSON.parse(res.response.text()) as T
-    } catch (e) {
-      lastError = e
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await withTimeout(model(name, schema).generateContent(parts), TIMEOUT_MS)
+        return JSON.parse(res.response.text()) as T
+      } catch (e) {
+        lastError = e
+        // setup problems won't go away by asking again
+        if (isSetupError(e)) throw friendlyError(e)
+        // a dropped connection, an overloaded server or a cut-off answer often works the second time
+        // after a timeout, move on to the lighter model rather than waiting again
+        if (!isTransient(e) || /^timeout/.test(errText(e))) break
+        await new Promise((r) => setTimeout(r, 1500))
+      }
     }
   }
   throw friendlyError(lastError)
 }
+
+/**
+ * A request that hangs should fail so it can be resent. The free fallback model can take close
+ * to a minute even for a short answer (and returns 500s with a lowered thinking level), so be patient.
+ */
+const TIMEOUT_MS = 120_000
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('timeout: AI-en svarte ikke i tide')), ms)
+    p.then(
+      (v) => (clearTimeout(t), resolve(v)),
+      (e) => (clearTimeout(t), reject(e)),
+    )
+  })
+}
+
+const errText = (e: unknown) => (e instanceof Error ? e.message : String(e))
+const isSetupError = (e: unknown) => /App Check|\[40[13]\b|PERMISSION_DENIED|has not been used|is disabled/i.test(errText(e))
+const isTransient = (e: unknown) =>
+  e instanceof SyntaxError || /timeout|Failed to fetch|NetworkError|network|Load failed|\[5\d\d\b|UNAVAILABLE|overloaded|INTERNAL|DEADLINE/i.test(errText(e))
 
 function friendlyError(e: unknown): Error {
   const msg = e instanceof Error ? e.message : String(e)
@@ -134,7 +167,9 @@ function friendlyError(e: unknown): Error {
     return new Error('AI-en avviste forespørselen fordi App Check ikke er satt opp for nettstedet. (Firebase-konsollen → App Check.)')
   if (/\[403\b|PERMISSION_DENIED|has not been used|is disabled/i.test(msg))
     return new Error('AI-tilbakemelding er ikke slått på ennå. Gå til Firebase-konsollen → AI Logic → Get started → Gemini Developer API.')
-  if (/Failed to fetch|NetworkError|network/i.test(msg)) return new Error('Ingen kontakt med AI-tjenesten — sjekk internettforbindelsen.')
+  if (/^timeout/i.test(msg)) return new Error('AI-en brukte for lang tid på å svare. Opptaket er lagret — send det på nytt.')
+  if (/Failed to fetch|NetworkError|network|Load failed/i.test(msg)) return new Error('Ingen kontakt med AI-tjenesten — sjekk internettforbindelsen. Opptaket er lagret — send det på nytt.')
+  if (/\[5\d\d\b|UNAVAILABLE|overloaded/i.test(msg)) return new Error('AI-tjenesten er overbelastet akkurat nå. Opptaket er lagret — vent litt og send det på nytt.')
   return new Error(`AI-tjenesten svarte med en feil: ${msg.replace(/^AI: Error fetching from \S+: /, '').slice(0, 160)}`)
 }
 

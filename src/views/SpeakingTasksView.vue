@@ -17,6 +17,7 @@ import {
   type FreeFeedback,
 } from '../lib/ai'
 import FreeFeedbackCard from '../components/FreeFeedbackCard.vue'
+import { deleteRecording, loadRecording, saveRecording, savedAtLabel, type SavedRecording } from '../lib/savedRecordings'
 import type { SpeakingTask, SpeakingTaskType } from '../types'
 
 /**
@@ -81,6 +82,43 @@ const turnNotes = ref<{ word: string; issue: string }[]>([])
 const learnerTurns = computed(() => history.value.filter((l) => l.who === 'learner').length)
 const convDone = ref(false)
 
+// recordings are kept on the device until the AI has judged them, so a failed call can be resent
+interface ConvState {
+  history: ConversationLine[]
+  turnNotes: { word: string; issue: string }[]
+}
+const savedKey = (t: SpeakingTask) => `${t.type === 'samtale' ? 'samtale' : 'svar'}-${t.id}`
+/** an unjudged recording (or unfinished conversation) from earlier, offered when a task opens */
+const saved = ref<SavedRecording<ConvState> | null>(null)
+/** resend the call that just failed */
+const retry = ref<(() => void) | null>(null)
+
+async function checkSaved(t: SpeakingTask) {
+  const rec = await loadRecording<ConvState>(savedKey(t))
+  if (active.value?.id === t.id && !feedback.value && !listening.value && learnerTurns.value === 0) saved.value = rec
+}
+
+function discardSaved() {
+  if (active.value) void deleteRecording(savedKey(active.value))
+  saved.value = null
+}
+
+function useSaved() {
+  const rec = saved.value
+  const t = active.value
+  saved.value = null
+  if (!rec || !t) return
+  if (t.type === 'samtale') {
+    history.value = rec.meta?.history ?? history.value
+    turnNotes.value = rec.meta?.turnNotes ?? []
+    // a turn that never got an answer: send it again
+    if (rec.blob || rec.transcript) void sendTurn(rec.transcript, rec.blob)
+  } else {
+    if (rec.transcript) transcript.value = rec.transcript
+    void judgeAnswer(rec.transcript, rec.blob)
+  }
+}
+
 function open(t: SpeakingTask) {
   capture.release()
   capture.clear()
@@ -92,6 +130,9 @@ function open(t: SpeakingTask) {
   history.value = []
   turnNotes.value = []
   convDone.value = false
+  saved.value = null
+  retry.value = null
+  void checkSaved(t)
   if (t.type === 'samtale' && t.role) {
     history.value = [{ who: 'ai', text: t.role.opening }]
     setTimeout(() => say(t.role!.opening), 300)
@@ -125,6 +166,8 @@ function startAnswer() {
   feedback.value = null
   passedNow.value = null
   aiError.value = ''
+  saved.value = null
+  retry.value = null
   stopAudio()
   capture.start({
     continuous: true,
@@ -138,6 +181,9 @@ async function judgeAnswer(t: string, blob: Blob | null) {
   const task = active.value
   if (!task) return
   aiLoading.value = true
+  aiError.value = ''
+  retry.value = null
+  void saveRecording(savedKey(task), { blob, transcript: t })
   try {
     const fb = await analyseFreeSpeech({
       question: task.prompt,
@@ -150,8 +196,10 @@ async function judgeAnswer(t: string, blob: Blob | null) {
     if (!transcript.value && fb.heard) transcript.value = fb.heard
     feedback.value = fb
     record(fb)
+    void deleteRecording(savedKey(task))
   } catch (e) {
     aiError.value = e instanceof Error ? e.message : String(e)
+    if (active.value?.id === task.id) retry.value = () => void judgeAnswer(t, blob)
   } finally {
     aiLoading.value = false
   }
@@ -160,6 +208,8 @@ async function judgeAnswer(t: string, blob: Blob | null) {
 /** one conversation turn */
 function startTurn() {
   aiError.value = ''
+  saved.value = null
+  retry.value = null
   stopAudio()
   capture.start({
     continuous: true,
@@ -173,6 +223,10 @@ async function sendTurn(t: string, blob: Blob | null) {
   const task = active.value
   if (!task?.role) return
   aiLoading.value = true
+  aiError.value = ''
+  retry.value = null
+  const key = savedKey(task)
+  void saveRecording<ConvState>(key, { blob, transcript: t, meta: { history: history.value, turnNotes: turnNotes.value } })
   try {
     const last = learnerTurns.value + 1 >= task.role.turns
     const turn = await conversationTurn({
@@ -189,9 +243,12 @@ async function sendTurn(t: string, blob: Blob | null) {
     history.value.push({ who: 'ai', text: turn.reply })
     capture.clear()
     say(turn.reply)
+    // keep the conversation so far (without a pending recording) so it can be continued after a reload
+    void saveRecording<ConvState>(key, { blob: null, transcript: '', meta: { history: history.value, turnNotes: turnNotes.value } })
     if (last) await finishConversation()
   } catch (e) {
     aiError.value = e instanceof Error ? e.message : String(e)
+    if (active.value?.id === task.id) retry.value = () => void sendTurn(t, blob)
   } finally {
     aiLoading.value = false
   }
@@ -206,8 +263,10 @@ async function finishConversation() {
     const fb = await conversationFeedback({ role: task.role.ai, goal: task.role.goal, level: chapter.value.level, history: history.value })
     feedback.value = fb
     record(fb)
+    void deleteRecording(savedKey(task))
   } catch (e) {
     aiError.value = e instanceof Error ? e.message : String(e)
+    if (active.value?.id === task.id) retry.value = () => void finishConversation()
   } finally {
     aiLoading.value = false
   }
@@ -276,6 +335,19 @@ watch(
         <span v-for="h in active.hints" :key="h" class="chip border border-rule bg-paper text-xs text-ink-soft">{{ h }}</span>
       </div>
 
+      <div v-if="saved && !aiLoading" class="mt-4 rounded-xl bg-gull-wash p-3 text-sm text-ink">
+        <p v-if="active.type === 'samtale'">
+          Du har en samtale som ikke ble ferdig ({{ savedAtLabel(saved.at) }}, {{ saved.meta?.history.filter((l) => l.who === 'learner').length ?? 0 }} svar{{ saved.blob ? ' + et opptak som ikke fikk svar' : '' }}).
+        </p>
+        <p v-else>Du har et opptak fra {{ savedAtLabel(saved.at) }} som AI-en ikke fikk vurdert<template v-if="saved.transcript">: «{{ saved.transcript }}»</template>.</p>
+        <div class="mt-2 flex flex-wrap gap-2">
+          <button class="btn btn-accent !py-1 text-sm" :disabled="!aiOk" @click="useSaved">
+            {{ active.type === 'samtale' ? '↺ Fortsett samtalen' : '🤖 Send opptaket til AI-en' }}
+          </button>
+          <button class="btn btn-ghost !py-1 text-sm" @click="discardSaved">Slett</button>
+        </div>
+      </div>
+
       <!-- single answer -->
       <template v-if="active.type !== 'samtale'">
         <div class="mt-4 flex flex-wrap items-center gap-2">
@@ -319,8 +391,9 @@ watch(
       </template>
 
       <p v-if="error" class="mt-3 text-sm font-bold text-rod">{{ error }}</p>
-      <p v-if="aiLoading && (active.type !== 'samtale' || convDone)" class="mt-4 text-sm font-bold text-fjord">🤖 AI-en vurderer svaret ditt …</p>
+      <p v-if="aiLoading && (active.type !== 'samtale' || convDone)" class="mt-4 text-sm font-bold text-fjord">🤖 AI-en vurderer svaret ditt … <span class="font-normal text-ink-faint">(kan ta opptil et minutt)</span></p>
       <p v-if="aiError" class="mt-3 text-sm font-bold text-rod">{{ aiError }}</p>
+      <button v-if="retry && !aiLoading && !listening" class="btn btn-primary mt-2 !py-1 text-sm" @click="retry()">🔁 Send samme opptak på nytt</button>
 
       <!-- result -->
       <template v-if="feedback">

@@ -5,6 +5,7 @@ import { stopAudio } from '../lib/audio'
 import { useSpeechCapture } from '../lib/useSpeechCapture'
 import { analyseFreeSpeech, conversationFeedback, conversationTurn, type ConversationLine, type FreeFeedback } from '../lib/ai'
 import FreeFeedbackCard from './FreeFeedbackCard.vue'
+import { deleteRecording, loadRecording, saveRecording, savedAtLabel, type SavedRecording } from '../lib/savedRecordings'
 import type { SpeakingTask } from '../types'
 
 /**
@@ -42,6 +43,30 @@ const history = ref<ConversationLine[]>(props.task.role ? [{ who: 'ai', text: pr
 const learnerTurns = computed(() => history.value.filter((l) => l.who === 'learner').length)
 const inConversation = ref(false)
 
+/** resend the call that just failed (the same recording) */
+const retry = ref<(() => void) | null>(null)
+
+// an unjudged recording for this task from before a reload
+const savedKey = `prove-${props.task.id}`
+const saved = ref<SavedRecording<{ history: ConversationLine[] }> | null>(null)
+void loadRecording<{ history: ConversationLine[] }>(savedKey).then((r) => {
+  if (r && !best.value && !listening.value) saved.value = r
+})
+function useSaved() {
+  const r = saved.value
+  saved.value = null
+  if (!r) return
+  if (props.task.type === 'samtale') {
+    history.value = r.meta?.history ?? history.value
+    inConversation.value = true
+    if (r.blob || r.transcript) void sendTurn(r.transcript, r.blob)
+  } else void judge(r.transcript, r.blob)
+}
+function discardSaved() {
+  saved.value = null
+  void deleteRecording(savedKey)
+}
+
 const canTry = computed(() => !props.submitted && attempts.value < MAX_ATTEMPTS && !aiLoading.value && !props.locked)
 
 function say(text: string) {
@@ -58,13 +83,21 @@ function grade(fb: FreeFeedback) {
   }
 }
 
-function fail(e: unknown) {
+function fail(e: unknown, again: () => void) {
   aiError.value = e instanceof Error ? e.message : String(e)
+  retry.value = again
   emit('failed')
+}
+
+function succeeded() {
+  aiError.value = ''
+  retry.value = null
 }
 
 function begin(onFinish: (t: string, blob: Blob | null) => void) {
   aiError.value = ''
+  retry.value = null
+  saved.value = null
   stopAudio()
   emit('busy', true)
   capture.start({
@@ -83,12 +116,15 @@ function startAnswer() {
 
 async function judge(t: string, blob: Blob | null) {
   aiLoading.value = true
+  succeeded()
+  void saveRecording(savedKey, { blob, transcript: t })
   try {
     const fb = await analyseFreeSpeech({ question: props.task.prompt, transcript: t, audio: blob, level: props.level, taskType: props.task.type, hints: props.task.hints })
     attempts.value++
     grade(fb)
+    void deleteRecording(savedKey)
   } catch (e) {
-    fail(e)
+    fail(e, () => void judge(t, blob))
   } finally {
     aiLoading.value = false
   }
@@ -110,6 +146,8 @@ async function sendTurn(t: string, blob: Blob | null) {
   const role = props.task.role
   if (!role) return
   aiLoading.value = true
+  succeeded()
+  void saveRecording(savedKey, { blob, transcript: t, meta: { history: history.value } })
   try {
     const last = learnerTurns.value + 1 >= role.turns
     const turn = await conversationTurn({ role: role.ai, goal: role.goal, level: props.level, history: history.value, transcript: t, audio: blob, last })
@@ -118,9 +156,10 @@ async function sendTurn(t: string, blob: Blob | null) {
     history.value.push({ who: 'ai', text: turn.reply })
     capture.clear()
     say(turn.reply)
+    void saveRecording(savedKey, { blob: null, transcript: '', meta: { history: history.value } })
     if (last) await finishConversation()
   } catch (e) {
-    fail(e)
+    fail(e, () => void sendTurn(t, blob))
   } finally {
     aiLoading.value = false
   }
@@ -131,12 +170,14 @@ async function finishConversation() {
   if (!role || !learnerTurns.value) return
   inConversation.value = false
   aiLoading.value = true
+  succeeded()
   try {
     const fb = await conversationFeedback({ role: role.ai, goal: role.goal, level: props.level, history: history.value })
     attempts.value++
     grade(fb)
+    void deleteRecording(savedKey)
   } catch (e) {
-    fail(e)
+    fail(e, () => void finishConversation())
   } finally {
     aiLoading.value = false
   }
@@ -196,8 +237,16 @@ async function finishConversation() {
 
     <p v-if="listening && recFailed" class="mt-2 rounded-lg bg-gull-wash p-2 text-sm text-ink">Live-teksten virker ikke akkurat nå, men opptaket går. Trykk ■ Ferdig når du er ferdig.</p>
     <p v-if="error" class="mt-2 text-sm font-bold text-rod">{{ error }}</p>
-    <p v-if="aiLoading && !inConversation" class="mt-2 text-sm font-bold text-fjord">🤖 AI-en vurderer …</p>
+    <p v-if="aiLoading && !inConversation" class="mt-2 text-sm font-bold text-fjord">🤖 AI-en vurderer … <span class="font-normal text-ink-faint">(kan ta opptil et minutt)</span></p>
     <p v-if="aiError" class="mt-2 text-sm font-bold text-rod">{{ aiError }}</p>
+    <button v-if="retry && !aiLoading && !listening && !submitted" class="btn btn-primary mt-2 !py-1 text-sm" @click="retry()">🔁 Send samme opptak på nytt</button>
+    <div v-if="saved && !aiLoading && !submitted" class="mt-3 rounded-lg bg-gull-wash p-3 text-sm text-ink">
+      <p>Du har et opptak til denne oppgaven fra {{ savedAtLabel(saved.at) }} som AI-en ikke fikk vurdert.</p>
+      <div class="mt-2 flex flex-wrap gap-2">
+        <button class="btn btn-accent !py-1 text-sm" :disabled="locked" @click="useSaved">🤖 {{ task.type === 'samtale' ? 'Fortsett samtalen' : 'Send opptaket til AI-en' }}</button>
+        <button class="btn btn-ghost !py-1 text-sm" @click="discardSaved">Slett</button>
+      </div>
+    </div>
 
     <p v-if="best && !submitted" class="mt-2 text-sm font-bold text-moss">
       ✓ Vurdert{{ attempts < MAX_ATTEMPTS ? ' — du kan ta ett nytt forsøk, det beste teller' : '' }}. Resultatet vises når du leverer.
