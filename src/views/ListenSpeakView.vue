@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { sentences } from '../data/sentences'
 import { chapterFromQuery, chapterLabel, kurs, kursSentences } from '../data/kurs'
@@ -9,6 +9,7 @@ import { speakNorwegian, speechAvailable } from '../lib/speech'
 import { stopAudio } from '../lib/audio'
 import { speakingSupported, useSpeechCapture } from '../lib/useSpeechCapture'
 import { compareSentence, normalizeWords, type Comparison } from '../lib/compare'
+import { deleteRecording, loadRecording, saveRecording, savedAtLabel, type SavedRecording } from '../lib/savedRecordings'
 import { aiAvailable, analyseFreeSpeech, analyseSentence, type FreeFeedback, type SentenceFeedback, type SentenceTask } from '../lib/ai'
 import FreeFeedbackCard from '../components/FreeFeedbackCard.vue'
 import type { Level, SentenceExercise } from '../types'
@@ -110,6 +111,7 @@ function resetItem() {
   aiCredited.value = false
   error.value = ''
   clearRecording()
+  void checkSaved()
   if (mode.value === 'diktat' || mode.value === 'gjenta') setTimeout(() => play(), 250)
   if (mode.value === 'fritt') setTimeout(() => playPrompt(), 250)
 }
@@ -142,12 +144,15 @@ function checkTyped() {
 // ── microphone (shared capture logic: src/lib/useSpeechCapture.ts) ──
 function clearRecording() {
   capture.clear()
+  restoredAudio.value = null
   freeFb.value = null
   sentFb.value = null
   aiError.value = ''
 }
 
 function startSpeaking() {
+  restoredAudio.value = null
+  saved.value = null
   freeFb.value = null
   sentFb.value = null
   aiError.value = ''
@@ -160,6 +165,9 @@ function startSpeaking() {
       if (!free) grade(t)
     },
     onFinish: ({ transcript: t, blob }) => {
+      // keep the recording on the device until the AI has judged it
+      const key = itemKey()
+      if (aiOk && key && (t || blob)) void saveRecording(key, { blob, transcript: t })
       if (autoAi.value && aiOk && (t || blob)) void askAi()
     },
   })
@@ -205,7 +213,42 @@ const sentFb = ref<SentenceFeedback | null>(null)
 /** the AI accepted an answer the word match rejected — counted once per sentence */
 const aiCredited = ref(false)
 
+/** spoken items only: the key a waiting recording is saved under */
+function itemKey(): string | null {
+  if (mode.value === 'diktat') return null
+  const text = mode.value === 'fritt' ? currentPrompt.value : current.value?.no
+  return text ? `lytt-${mode.value}-${text}` : null
+}
+
+/** a recording of this item that the AI never judged (e.g. before a reload) */
+const saved = ref<SavedRecording | null>(null)
+/** the audio of a saved recording being resent (there is no live recording after a reload) */
+const restoredAudio = shallowRef<Blob | null>(null)
+async function checkSaved() {
+  saved.value = null
+  const key = itemKey()
+  if (!aiOk || !key) return
+  const rec = await loadRecording(key)
+  if (itemKey() === key && !hasRecording.value && !listening.value) saved.value = rec
+}
+function useSaved() {
+  const rec = saved.value
+  saved.value = null
+  if (!rec) return
+  transcript.value = rec.transcript
+  restoredAudio.value = rec.blob
+  if (mode.value !== 'fritt' && rec.transcript) grade(rec.transcript)
+  void askAi()
+}
+function discardSaved() {
+  const key = itemKey()
+  if (key) void deleteRecording(key)
+  saved.value = null
+}
+
 async function askAi() {
+  const audio = capture.blob() ?? restoredAudio.value
+  const key = itemKey()
   aiLoading.value = true
   aiError.value = ''
   try {
@@ -213,7 +256,7 @@ async function askAi() {
       freeFb.value = await analyseFreeSpeech({
         question: currentPrompt.value,
         transcript: transcript.value,
-        audio: capture.blob(),
+        audio,
         level: chapter.value?.level ?? (levelFilter.value === 'alle' ? 'B1' : levelFilter.value),
       })
       // live recognition gave nothing — show what the AI heard instead
@@ -225,7 +268,7 @@ async function askAi() {
         target: current.value.no,
         english: current.value.en,
         answer: task === 'diktat' ? typed.value : transcript.value,
-        audio: capture.blob(),
+        audio,
       })
       // live recognition gave nothing — use what the AI heard for «Du sa» and the word match
       if (task !== 'diktat' && !transcript.value && sentFb.value.heard) {
@@ -239,6 +282,7 @@ async function askAi() {
         revealed.value = true
       }
     }
+    if (key) void deleteRecording(key)
   } catch (e) {
     aiError.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -367,6 +411,13 @@ const freeStats = computed(() => {
 
         <p v-if="error" class="mt-3 text-sm font-bold text-rod">{{ error }}</p>
 
+<div v-if="saved && !aiLoading && !listening" class="mt-3 rounded-lg bg-gull-wash p-3 text-sm text-ink">
+          Du har et opptak fra {{ savedAtLabel(saved.at) }} som AI-en ikke fikk vurdert<template v-if="saved.transcript">: «{{ saved.transcript }}»</template>.
+          <div class="mt-2 flex flex-wrap gap-2">
+            <button class="btn btn-accent !py-1 text-sm" @click="useSaved">🤖 Send opptaket til AI-en</button>
+            <button class="btn btn-ghost !py-1 text-sm" @click="discardSaved">Slett</button>
+          </div>
+        </div>
         <p v-if="listening && recFailed" class="mt-3 rounded-lg bg-gull-wash p-2 text-sm text-ink">
           Live-teksten virker ikke i denne nettleseren akkurat nå, men opptaket går. Trykk <strong>■ Ferdig</strong> når du er ferdig, så lytter AI-en til svaret.
         </p>
@@ -375,7 +426,7 @@ const freeStats = computed(() => {
           <p class="mt-1 leading-relaxed text-ink">{{ transcript }}</p>
         </div>
 
-        <template v-if="!listening && (transcript || hasRecording)">
+        <template v-if="!listening && (transcript || hasRecording || restoredAudio)">
           <audio v-if="recordingUrl" :src="recordingUrl" controls class="mt-4 w-full" />
           <div class="mt-4 grid gap-3 sm:grid-cols-2">
             <div class="rounded-xl border border-rule p-3">
@@ -404,8 +455,8 @@ const freeStats = computed(() => {
             </ul>
           </div>
           <div v-if="aiOk" class="mt-4">
-            <p v-if="aiLoading" class="text-sm font-bold text-fjord">🤖 AI-en lytter til svaret ditt …</p>
-            <button v-else-if="!freeFb" class="btn btn-primary" :disabled="listening" @click="askAi">🤖 Få tilbakemelding fra AI</button>
+            <p v-if="aiLoading" class="text-sm font-bold text-fjord">🤖 AI-en lytter til svaret ditt … <span class="font-normal text-ink-faint">(kan ta opptil et minutt)</span></p>
+            <button v-else-if="!freeFb" class="btn btn-primary" :disabled="listening" @click="askAi">{{ aiError ? '🔁 Send samme opptak på nytt' : '🤖 Få tilbakemelding fra AI' }}</button>
             <p v-if="aiError" class="mt-2 text-sm font-bold text-rod">{{ aiError }}</p>
           </div>
 
@@ -473,6 +524,13 @@ const freeStats = computed(() => {
             <button v-if="!revealed" class="btn btn-ghost" @click="reveal">Vis svar</button>
             <span v-if="listening" class="text-sm font-bold text-rod">● Lytter …</span>
           </div>
+  <div v-if="saved && !aiLoading && !listening" class="mt-3 rounded-lg bg-gull-wash p-3 text-sm text-ink">
+            Du har et opptak fra {{ savedAtLabel(saved.at) }} som AI-en ikke fikk vurdert<template v-if="saved.transcript">: «{{ saved.transcript }}»</template>.
+            <div class="mt-2 flex flex-wrap gap-2">
+              <button class="btn btn-accent !py-1 text-sm" @click="useSaved">🤖 Send opptaket til AI-en</button>
+              <button class="btn btn-ghost !py-1 text-sm" @click="discardSaved">Slett</button>
+            </div>
+          </div>
           <p v-if="listening && recFailed" class="mt-2 rounded-lg bg-gull-wash p-2 text-sm text-ink">
             Live-teksten virker ikke akkurat nå, men opptaket går. Trykk <strong>■ Stopp</strong> når du er ferdig, så lytter AI-en til deg.
           </p>
@@ -506,10 +564,10 @@ const freeStats = computed(() => {
         </div>
 
         <!-- AI feedback (all sentence modes) -->
-        <div v-if="aiOk && !listening && (mode === 'diktat' ? !!result : !!transcript || hasRecording)" class="mt-4">
-          <p v-if="aiLoading" class="text-sm font-bold text-fjord">🤖 AI-en ser på svaret ditt …</p>
+        <div v-if="aiOk && !listening && (mode === 'diktat' ? !!result : !!transcript || hasRecording || !!restoredAudio)" class="mt-4">
+          <p v-if="aiLoading" class="text-sm font-bold text-fjord">🤖 AI-en ser på svaret ditt … <span class="font-normal text-ink-faint">(kan ta opptil et minutt)</span></p>
           <button v-else-if="!sentFb" class="btn btn-primary !py-1 text-sm" @click="askAi">
-            🤖 {{ mode === 'diktat' ? 'Forklar feilene med AI' : 'Få tilbakemelding fra AI' }}
+            {{ aiError ? (mode === 'diktat' ? '🔁 Prøv AI-en igjen' : '🔁 Send samme opptak på nytt') : mode === 'diktat' ? '🤖 Forklar feilene med AI' : '🤖 Få tilbakemelding fra AI' }}
           </button>
           <p v-if="aiError" class="mt-2 text-sm font-bold text-rod">{{ aiError }}</p>
         </div>
