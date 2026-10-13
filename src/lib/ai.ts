@@ -30,7 +30,7 @@ const errorSchema = Schema.object({
 
 const freeSchema = Schema.object({
   properties: {
-    heard: Schema.string({ description: 'what the learner said, transcribed from the audio in Norwegian bokmål' }),
+    heard: Schema.string({ description: 'what the learner said, transcribed from the audio in Norwegian bokmål, with normal capitals and punctuation' }),
     corrected: Schema.string({ description: 'the whole answer rewritten as natural, correct bokmål, keeping the learner’s meaning and level' }),
     errors: Schema.array({ items: errorSchema }),
     pronunciation: Schema.object({
@@ -259,7 +259,7 @@ export interface ConversationTurn {
 
 const turnSchema = Schema.object({
   properties: {
-    heard: Schema.string({ description: 'what the learner just said, transcribed from the audio in bokmål' }),
+    heard: Schema.string({ description: 'what the learner just said, transcribed from the audio in bokmål, with normal capitals and punctuation' }),
     reply: Schema.string({ description: 'your next line in the role, in Norwegian' }),
     notes: Schema.array({
       items: Schema.object({

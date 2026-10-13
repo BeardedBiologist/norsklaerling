@@ -55,6 +55,23 @@ const ERRORS: Record<string, string> = {
   network: 'Talegjenkjenningen trenger internett.',
 }
 
+/** a sentence that starts with a question word gets «?» */
+const QUESTION_START = /^(hva|hvem|hvor|hvorfor|hvordan|hvilken|hvilket|hvilke|når)\b/i
+
+/**
+ * Speech recognition gives no punctuation or capitals. Each final result
+ * (a stretch of speech up to a pause) is turned into a sentence: capital
+ * first letter and a full stop, or «?» after a question word. Text the
+ * recogniser already punctuated (Safari sometimes does) is left as it is.
+ */
+export function asSentence(text: string, final: boolean): string {
+  const t = text.trim()
+  if (!t) return ''
+  const capped = t[0].toLocaleUpperCase('nb-NO') + t.slice(1)
+  if (!final || /[.!?…]$/.test(capped)) return capped
+  return capped + (QUESTION_START.test(capped) ? '?' : '.')
+}
+
 /** start listening in Norwegian (bokmål) */
 export function listen(opts: ListenOptions): Listening | null {
   const C = ctor()
@@ -70,15 +87,16 @@ export function listen(opts: ListenOptions): Listening | null {
     interim = ''
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const r = e.results[i]
-      if (r.isFinal) finalText += r[0].transcript + ' '
+      if (r.isFinal) finalText += asSentence(r[0].transcript, true) + ' '
       else interim += r[0].transcript
     }
-    opts.onUpdate?.((finalText + interim).trim())
+    opts.onUpdate?.((finalText + asSentence(interim, false)).trim())
   }
   rec.onerror = (e) => {
     if (e.error !== 'aborted') opts.onError?.(ERRORS[e.error] ?? `Talegjenkjenning feilet (${e.error}).`, e.error)
   }
-  rec.onend = () => opts.onDone((finalText + interim).trim())
+  // speech cut off before it was final still ends as a sentence
+  rec.onend = () => opts.onDone((finalText + asSentence(interim, true)).trim())
   try {
     rec.start()
   } catch {
