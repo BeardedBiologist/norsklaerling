@@ -13,7 +13,7 @@ export interface SavedRecording<M = unknown> {
   meta?: M
 }
 
-const DB = 'norsklaerling-recordings'
+const DB = 'norskveien-recordings'
 const STORE = 'pending'
 /** older recordings are dropped */
 const MAX_AGE = 7 * 24 * 3600 * 1000

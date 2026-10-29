@@ -35,7 +35,7 @@ const nav = [
   <!-- splash while Firebase restores the session -->
   <div v-if="!auth.ready" class="flex min-h-screen items-center justify-center">
     <span class="display animate-pulse text-3xl font-black text-ink">
-      Norsk<em class="text-rod not-italic">Lærling</em>
+      Norsk<em class="text-rod not-italic">veien</em>
     </span>
   </div>
 
@@ -49,7 +49,7 @@ const nav = [
       <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <RouterLink to="/" class="group flex items-baseline gap-2 no-underline">
           <span class="display text-2xl font-black tracking-tight text-ink">
-            Norsk<em class="text-rod not-italic font-black">Lærling</em>
+            Norsk<em class="text-rod not-italic font-black">veien</em>
           </span>
           <span class="kicker hidden sm:inline">A1 → A2 → B1 → B2</span>
         </RouterLink>

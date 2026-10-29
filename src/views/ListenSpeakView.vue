@@ -40,7 +40,7 @@ const levels: (Level | 'alle')[] = ['alle', 'A1', 'A2', 'B1', 'B2']
 const micOk = speakingSupported(aiAvailable())
 
 /** run AI feedback automatically after every answer (remembered in this browser) */
-const AUTO_KEY = 'norsklaerling-ai-auto'
+const AUTO_KEY = 'norskveien-ai-auto'
 const autoAi = ref(true)
 try {
   autoAi.value = localStorage.getItem(AUTO_KEY) !== '0'

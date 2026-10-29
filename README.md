@@ -1,4 +1,4 @@
-# NorskLærling
+# Norskveien
 
 A personal Norwegian trainer for getting from A1 to **B1/B2** — built around the two
 exams required for Norwegian citizenship

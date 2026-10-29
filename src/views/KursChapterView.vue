@@ -397,7 +397,7 @@ function toggleManual(key: string) {
     </template>
 
     <p class="mt-8 text-center text-xs text-ink-faint">
-      Rekkefølgen følger NTNUs gratiskurs {{ course.source.name }}. Tekster og lyd © NTNU — forklaringer, spørsmål og øvelser her er laget for NorskLærling.
+      Rekkefølgen følger NTNUs gratiskurs {{ course.source.name }}. Tekster og lyd © NTNU — forklaringer, spørsmål og øvelser her er laget for Norskveien.
     </p>
   </div>
 

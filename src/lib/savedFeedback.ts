@@ -20,7 +20,7 @@ export interface StoredFeedback<F = unknown> {
   notes?: { word: string; issue: string }[]
 }
 
-const LOCAL_KEY = 'norsklaerling-feedback-v1'
+const LOCAL_KEY = 'norskveien-feedback-v1'
 /** localStorage keeps only the most recent ones */
 const LOCAL_MAX = 150
 

@@ -20,7 +20,7 @@ async function signIn() {
       <div class="w-full max-w-md">
         <p class="kicker rise rise-1 text-center">Veien til norsk statsborgerskap</p>
         <h1 class="display rise rise-1 mt-2 text-center text-5xl font-black tracking-tight text-ink">
-          Norsk<em class="text-rod not-italic">Lærling</em>
+          Norsk<em class="text-rod not-italic">veien</em>
         </h1>
         <p class="rise rise-2 mt-3 text-center text-ink-soft">
           Ordforråd, setningsbygging og statsborgerprøven —<br />

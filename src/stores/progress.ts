@@ -8,7 +8,7 @@ import { vocabulary } from '../data/vocabulary'
 import { db } from '../lib/firebase'
 import { useAuthStore } from './auth'
 
-const STORAGE_KEY = 'norsklaerling-progress-v1'
+const STORAGE_KEY = 'norskveien-progress-v1'
 /**
  * Firestore write budget: localStorage is the source of truth during a
  * session, so we only push to the cloud after a long quiet period — plus
