@@ -26,7 +26,6 @@ const modules = [
     title: 'Reisen A1 → B1',
     desc: 'Nybegynnerkurs (12 kapitler, etter NTNUs LearnNoW) og B1-kurs (10 kapitler, etter NoW2) — grammatikk, ord, uttale og muntlige øvelser.',
     accent: 'gull',
-    number: 'A1',
   },
   {
     to: '/laer',
@@ -34,7 +33,6 @@ const modules = [
     title: 'Leksjoner',
     desc: 'Når grunnmuren sitter: B1-grammatikk forklart på engelsk og hele pensumet til statsborgerprøven — lær først, test etterpå.',
     accent: 'moss',
-    number: '00',
   },
   {
     to: '/ord',
@@ -42,7 +40,6 @@ const modules = [
     title: 'Ordforråd',
     desc: `Flashcards med smart repetisjon. ${vocabulary.length} ord fra A1 til B2 med eksempler og uttale.`,
     accent: 'rod',
-    number: '01',
   },
   {
     to: '/setninger',
@@ -50,7 +47,6 @@ const modules = [
     title: 'Setningsbygging',
     desc: 'Sett ordene i riktig rekkefølge. Tren V2-regelen, leddsetninger og «ikke».',
     accent: 'fjord',
-    number: '02',
   },
   {
     to: '/quiz',
@@ -58,7 +54,6 @@ const modules = [
     title: 'Grammatikkquiz',
     desc: 'Flervalgsoppgaver i norskprøve-stil med forklaringer på hver regel.',
     accent: 'moss',
-    number: '03',
   },
   {
     to: '/statsborger',
@@ -66,7 +61,6 @@ const modules = [
     title: 'Statsborgerprøven',
     desc: 'Øv på samfunnskunnskap — eller ta full prøvesimulering: 36 spørsmål, 60 minutter.',
     accent: 'gull',
-    number: '04',
   },
   {
     to: '/lytt',
@@ -74,7 +68,6 @@ const modules = [
     title: 'Lytt og snakk',
     desc: 'Diktat, hør-og-gjenta, si det på norsk og fri muntlig trening med mikrofon — med tilbakemelding ord for ord.',
     accent: 'moss',
-    number: '07',
   },
   {
     to: '/oversett',
@@ -82,7 +75,6 @@ const modules = [
     title: 'Oversettelse',
     desc: 'Skriv norsken selv: engelsk setning inn, din norske oversettelse ut. Fri produksjon som på muntligprøven.',
     accent: 'rod',
-    number: '05',
   },
   {
     to: '/boyning',
@@ -90,7 +82,6 @@ const modules = [
     title: 'Bøyning',
     desc: 'Preteritum, bestemt form, komparativ — skriv riktig form. Fasit fra den offisielle ordboka.',
     accent: 'fjord',
-    number: '06',
   },
 ]
 </script>
@@ -169,7 +160,7 @@ const modules = [
     <!-- modules -->
     <section class="rise rise-3 mb-12 grid gap-4 sm:grid-cols-2">
       <RouterLink
-        v-for="m in modules"
+        v-for="(m, i) in modules"
         :key="m.to"
         :to="m.to"
         class="card group relative overflow-hidden p-6 no-underline transition-shadow hover:shadow-lift"
@@ -183,7 +174,7 @@ const modules = [
             'text-gull': m.accent === 'gull',
           }"
           aria-hidden="true"
-          >{{ m.number }}</span
+          >{{ String(i + 1).padStart(2, '0') }}</span
         >
         <h2 class="display text-2xl font-black text-ink">{{ m.title }}</h2>
         <p class="mt-2 text-sm text-ink-soft">{{ m.desc }}</p>

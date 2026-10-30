@@ -16,6 +16,12 @@ const syncLabel: Record<string, string> = {
   error: 'lagring feilet',
 }
 
+async function logOut() {
+  // push any pending changes before the auth token goes away
+  await progress.flushCloudSave()
+  await auth.logOut()
+}
+
 const nav = [
   { to: '/', label: 'Hjem', name: 'home' },
   { to: '/kurs', label: 'Reisen', name: 'kurs' },
@@ -74,6 +80,14 @@ const nav = [
               {{ syncLabel[progress.syncStatus] }}
             </span>
           </RouterLink>
+
+          <button
+            v-if="auth.enabled && auth.user"
+            class="chip border border-rule bg-card text-ink-soft hover:bg-paper-warm hover:text-ink"
+            @click="logOut"
+          >
+            Logg ut
+          </button>
         </div>
       </div>
 
